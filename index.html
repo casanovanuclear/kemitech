@@ -14,15 +14,18 @@ main{padding:2rem;max-width:1500px;margin:auto}
 .card{background:var(--c);padding:1.5rem;border-radius:10px;box-shadow:0 5px 15px rgba(0,0,0,.08);margin-bottom:1.5rem}
 .grid{display:grid;grid-template-columns:1fr 2fr;gap:2rem}
 label{display:block;margin-top:.6rem}
-input,select{width:100%;padding:.5rem;margin-top:.3rem}
-button{margin-top:1rem;padding:.5rem 1rem;border:0;border-radius:6px;cursor:pointer}
+input,select,button{width:100%;padding:.5rem;margin-top:.3rem;border-radius:6px;border:1px solid #ccc;}
+button{cursor:pointer;border:none}
 .primary{background:var(--p);color:#fff}
 .danger{background:var(--d);color:#fff}
-table{width:100%;border-collapse:collapse;margin-top:.5rem}
-th,td{padding:.5rem;border-bottom:1px solid #ddd;font-size:.9rem}
+table{width:100%;border-collapse:collapse;margin-top:.5rem;display:block;overflow-x:auto}
+th,td{padding:.5rem;border-bottom:1px solid #ddd;font-size:.9rem;white-space:nowrap;}
 .small{font-size:.8rem;color:#666}
 .flex{display:flex;gap:1rem;flex-wrap:wrap}
-@media(max-width:900px){.grid{grid-template-columns:1fr}}
+@media(max-width:900px){
+  .grid{grid-template-columns:1fr}
+  table{display:block;overflow-x:auto}
+}
 </style>
 </head>
 <body>
@@ -118,27 +121,11 @@ th,td{padding:.5rem;border-bottom:1px solid #ddd;font-size:.9rem}
 <option value="month">This Month</option>
 </select>
 <p><strong>Available Cash:</strong> <span id="cash">0</span></p>
-<p>Revenue: <span id="rev">0</span></p>
-<p>Expenses: <span id="exp">0</span></p>
-<p><strong>Net Profit:</strong> <span id="profit">0</span></p>
 </div>
- <div class="card">
-  <h3>Reset Application</h3>
-  <button class="danger" onclick="resetApp()">Reset App</button>
-  <p class="small">This will delete all products, sales, and expenses permanently.</p>
-</div>
-
 
 </main>
 
 <script>
- function resetApp() {
-  if(confirm('Are you sure you want to reset the app? This will delete all data permanently.')) {
-    localStorage.removeItem('KEMITECH_DB'); // delete the stored database
-    location.reload(); // refresh the page to start fresh
-  }
-}
-
 const APP_PASSWORD='money@2026';
 function unlock(){ if(pwd.value===APP_PASSWORD) lock.style.display='none'; else alert('Wrong password'); }
 
@@ -146,10 +133,10 @@ let db=JSON.parse(localStorage.getItem('KEMITECH_DB'))||{products:[],sales:[],ex
 const save=()=>{localStorage.setItem('KEMITECH_DB',JSON.stringify(db));render();}
 const now=()=>new Date();
 const inRange=(d,r)=>{
- const t=new Date(d),n=now();
+ const t=new Date(d), n=now();
  if(r==='day') return t.toDateString()===n.toDateString();
  if(r==='week') return (n-t)/(1000*60*60*24)<=7;
- if(r==='month') return t.getMonth()===n.getMonth()&&t.getFullYear()===n.getFullYear();
+ if(r==='month') return t.getMonth()===n.getMonth() && t.getFullYear()===n.getFullYear();
  return true;
 }
 
@@ -158,20 +145,20 @@ function fillProduct(){ const q=psearch.value.toLowerCase(); const p=db.products
 function addOrRestock(){
  const name=pname.value.trim(); const qty=+stock.value; if(!name||qty<=0) return;
  let p=db.products.find(x=>x.name.toLowerCase()===name.toLowerCase());
- if(p){ p.stock+=qty; p.history.push({d:now().toLocaleString(),q:qty}); }
- else{ if(+buy.value<=0||+sell.value<=0) return; db.products.push({name, buy:+buy.value, sell:+sell.value, stock:qty, history:[{d:now().toLocaleString(),q:qty}]}); }
+ if(p){ p.stock+=qty; p.history.push({d:now().toISOString(),q:qty}); }
+ else{ if(+buy.value<=0||+sell.value<=0) return; db.products.push({name, buy:+buy.value, sell:+sell.value, stock:qty, history:[{d:now().toISOString(),q:qty}]}); }
  pname.value=buy.value=sell.value=stock.value=psearch.value=''; save();
 }
 
 function sellItem(){
  const i=sellProduct.value,q=+sellQty.value; if(!q) return;
  const p=db.products[i]; if(q>p.stock) return alert('Low stock');
- p.stock-=q; p.history.push({d:now().toLocaleString(),q:-q});
- db.sales.unshift({d:now().toLocaleString(),n:p.name,q,r:q*p.sell,prof:q*(p.sell-p.buy)});
+ p.stock-=q; p.history.push({d:now().toISOString(),q:-q});
+ db.sales.unshift({d:now().toISOString(),n:p.name,q,r:q*p.sell,prof:q*(p.sell-p.buy)});
  sellQty.value=''; save();
 }
 
-function addExpense(){ const a=+expAmt.value; if(a<=0) return; db.expenses.unshift({d:now().toLocaleString(),n:expDesc.value,a}); expDesc.value=expAmt.value=''; save(); }
+function addExpense(){ const a=+expAmt.value; if(a<=0) return; db.expenses.unshift({d:now().toISOString(),n:expDesc.value,a}); expDesc.value=expAmt.value=''; save(); }
 function removeProduct(i){ if(confirm('Delete product?')){ db.products.splice(i,1); save(); } }
 
 function render(){
@@ -183,26 +170,25 @@ function render(){
   sellProduct.innerHTML+=`<option value="${i}">${p.name}</option>`;
  });
 
- const sr=saleRange.value, ss=saleSearch.value.toLowerCase(); let rev=0,cost=0;
- db.sales.forEach(x=>{ if(!x.n.toLowerCase().includes(ss)||!inRange(x.d,sr)) return;
+ // Sales Table
+ const sr=saleRange.value, ss=saleSearch.value.toLowerCase();
+ db.sales.forEach(x=>{
+  if(!x.n.toLowerCase().includes(ss)||!inRange(x.d,sr)) return;
   sales.innerHTML+=`<tr><td>${x.d}</td><td>${x.n}</td><td>${x.q}</td><td>${x.r.toFixed(2)}</td><td>${x.prof.toFixed(2)}</td></tr>`;
-  rev+=x.r; cost+=x.q*(db.products.find(p=>p.name===x.n)?.buy||0);
  });
 
- const er=expRange.value; let expT=0;
- db.expenses.forEach(e=>{ if(!inRange(e.d,er)) return; expenses.innerHTML+=`<tr><td>${e.d}</td><td>${e.n}</td><td>${e.a.toFixed(2)}</td></tr>`; expT+=e.a; });
+ // Expenses Table
+ const er=expRange.value;
+ db.expenses.forEach(e=>{
+  if(!inRange(e.d,er)) return;
+  expenses.innerHTML+=`<tr><td>${e.d}</td><td>${e.n}</td><td>${e.a.toFixed(2)}</td></tr>`;
+ });
 
+ // Summary: only available cash
  const srng=sumRange.value;
- const fSales=db.sales.filter(x=>inRange(x.d,srng));
- const fExp=db.expenses.filter(x=>inRange(x.d,srng));
- const sRev=fSales.reduce((t,x)=>t+x.r,0);
- const sCost=fSales.reduce((t,x)=>t+x.q*(db.products.find(p=>p.name===x.n)?.buy||0),0);
- const sExp=fExp.reduce((t,x)=>t+x.a,0);
- cash.textContent=(sRev-sExp).toFixed(2);
- rev.textContent=sRev.toFixed(2);
- cost.textContent=sCost.toFixed(2);
- exp.textContent=sExp.toFixed(2);
- profit.textContent=(sRev-sCost-sExp).toFixed(2);
+ const totalRev=db.sales.filter(x=>inRange(x.d,srng)).reduce((t,x)=>t+x.r,0);
+ const totalExp=db.expenses.filter(x=>inRange(x.d,srng)).reduce((t,x)=>t+x.a,0);
+ cash.textContent=(totalRev-totalExp).toFixed(2);
 }
 render();
 </script>
