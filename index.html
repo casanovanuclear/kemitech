@@ -132,11 +132,11 @@ th,td{padding:.5rem;border-bottom:1px solid #ddd;font-size:.9rem}
 </main>
 
 <script>
- function resetApp() {
-  if(confirm('Are you sure you want to reset the app? This will delete all data permanently.')) {
-    localStorage.removeItem('KEMITECH_DB'); // delete the stored database
-    location.reload(); // refresh the page to start fresh
-  }
+function resetApp(){
+ if(confirm('Are you sure you want to reset the app? This will delete all data permanently.')){
+  localStorage.removeItem('KEMITECH_DB');
+  location.reload();
+ }
 }
 
 const APP_PASSWORD='money@2026';
@@ -144,63 +144,130 @@ function unlock(){ if(pwd.value===APP_PASSWORD) lock.style.display='none'; else 
 
 let db=JSON.parse(localStorage.getItem('KEMITECH_DB'))||{products:[],sales:[],expenses:[]};
 const save=()=>{localStorage.setItem('KEMITECH_DB',JSON.stringify(db));render();}
-const now=()=>new Date();
-const inRange=(d,r)=>{
- const t=new Date(d),n=now();
+const now=()=>new Date().toISOString();
+
+function inRange(d,r){
+ const t=new Date(d), n=new Date();
  if(r==='day') return t.toDateString()===n.toDateString();
  if(r==='week') return (n-t)/(1000*60*60*24)<=7;
- if(r==='month') return t.getMonth()===n.getMonth()&&t.getFullYear()===n.getFullYear();
+ if(r==='month') return t.getMonth()===n.getMonth() && t.getFullYear()===n.getFullYear();
  return true;
 }
 
-function fillProduct(){ const q=psearch.value.toLowerCase(); const p=db.products.find(x=>x.name.toLowerCase()===q); if(p){pname.value=p.name;buy.value=p.buy;sell.value=p.sell;} }
+// ---------- PRODUCTS ----------
+function fillProduct(){
+ const q=psearch.value.toLowerCase();
+ const p=db.products.find(x=>x.name.toLowerCase()===q);
+ if(p){ pname.value=p.name; buy.value=p.buy; sell.value=p.sell; }
+}
 
 function addOrRestock(){
- const name=pname.value.trim(); const qty=+stock.value; if(!name||qty<=0) return;
+ const name=pname.value.trim(), qty=+stock.value;
+ if(!name||qty<=0) return;
  let p=db.products.find(x=>x.name.toLowerCase()===name.toLowerCase());
- if(p){ p.stock+=qty; p.history.push({d:now().toLocaleString(),q:qty}); }
- else{ if(+buy.value<=0||+sell.value<=0) return; db.products.push({name, buy:+buy.value, sell:+sell.value, stock:qty, history:[{d:now().toLocaleString(),q:qty}]}); }
- pname.value=buy.value=sell.value=stock.value=psearch.value=''; save();
+ if(p){
+  p.stock+=qty;
+  p.history.push({d:now(),q:qty});
+ }else{
+  if(+buy.value<=0||+sell.value<=0) return;
+  db.products.push({
+   name, buy:+buy.value, sell:+sell.value,
+   stock:qty,
+   history:[{d:now(),q:qty}]
+  });
+ }
+ pname.value=buy.value=sell.value=stock.value=psearch.value='';
+ save();
 }
 
 function sellItem(){
- const i=sellProduct.value,q=+sellQty.value; if(!q) return;
- const p=db.products[i]; if(q>p.stock) return alert('Low stock');
- p.stock-=q; p.history.push({d:now().toLocaleString(),q:-q});
- db.sales.unshift({d:now().toLocaleString(),n:p.name,q,r:q*p.sell,prof:q*(p.sell-p.buy)});
- sellQty.value=''; save();
+ const i=sellProduct.value, q=+sellQty.value;
+ if(!q) return;
+ const p=db.products[i];
+ if(q>p.stock) return alert('Low stock');
+
+ p.stock-=q;
+ p.history.push({d:now(),q:-q});
+
+ db.sales.unshift({
+  d:now(),
+  n:p.name,
+  q,
+  r:q*p.sell,
+  prof:q*(p.sell-p.buy)
+ });
+ sellQty.value='';
+ save();
 }
 
-function addExpense(){ const a=+expAmt.value; if(a<=0) return; db.expenses.unshift({d:now().toLocaleString(),n:expDesc.value,a}); expDesc.value=expAmt.value=''; save(); }
-function removeProduct(i){ if(confirm('Delete product?')){ db.products.splice(i,1); save(); } }
+// ---------- EXPENSE ----------
+function addExpense(){
+ const a=+expAmt.value;
+ if(a<=0) return;
+ db.expenses.unshift({d:now(),n:expDesc.value,a});
+ expDesc.value=expAmt.value='';
+ save();
+}
 
+function removeProduct(i){
+ if(confirm('Delete product?')){
+  db.products.splice(i,1);
+  save();
+ }
+}
+
+// ---------- RENDER ----------
 function render(){
- products.innerHTML=''; sales.innerHTML=''; expenses.innerHTML=''; sellProduct.innerHTML='';
+ products.innerHTML='';
+ sales.innerHTML='';
+ expenses.innerHTML='';
+ sellProduct.innerHTML='';
+
  const ps=search.value.toLowerCase();
+ const pr=sumRange.value;
+
  db.products.forEach((p,i)=>{
   if(!p.name.toLowerCase().includes(ps)) return;
-  products.innerHTML+=`<tr><td>${p.name}</td><td>${p.stock}</td><td>${p.history.at(-1)?.d||''}</td><td>${p.history.map(h=>`${h.d}: ${h.q>0?'+'+h.q:h.q}`).join('<br>')}</td><td><button class="danger" onclick="removeProduct(${i})">X</button></td></tr>`;
+  const hist=p.history.filter(h=>inRange(h.d,pr));
+  products.innerHTML+=`
+   <tr>
+    <td>${p.name}</td>
+    <td>${p.stock}</td>
+    <td>${hist.at(-1)?.d||''}</td>
+    <td>${hist.map(h=>`${h.d}: ${h.q>0?'+'+h.q:h.q}`).join('<br>')}</td>
+    <td><button class="danger" onclick="removeProduct(${i})">X</button></td>
+   </tr>`;
   sellProduct.innerHTML+=`<option value="${i}">${p.name}</option>`;
  });
 
- const sr=saleRange.value, ss=saleSearch.value.toLowerCase(); let rev=0,cost=0;
- db.sales.forEach(x=>{ if(!x.n.toLowerCase().includes(ss)||!inRange(x.d,sr)) return;
-  sales.innerHTML+=`<tr><td>${x.d}</td><td>${x.n}</td><td>${x.q}</td><td>${x.r.toFixed(2)}</td><td>${x.prof.toFixed(2)}</td></tr>`;
-  rev+=x.r; cost+=x.q*(db.products.find(p=>p.name===x.n)?.buy||0);
+ const sr=saleRange.value, ss=saleSearch.value.toLowerCase();
+ db.sales.forEach(x=>{
+  if(!x.n.toLowerCase().includes(ss)||!inRange(x.d,sr)) return;
+  sales.innerHTML+=`
+   <tr>
+    <td>${x.d}</td><td>${x.n}</td><td>${x.q}</td>
+    <td>${x.r.toFixed(2)}</td><td>${x.prof.toFixed(2)}</td>
+   </tr>`;
  });
 
- const er=expRange.value; let expT=0;
- db.expenses.forEach(e=>{ if(!inRange(e.d,er)) return; expenses.innerHTML+=`<tr><td>${e.d}</td><td>${e.n}</td><td>${e.a.toFixed(2)}</td></tr>`; expT+=e.a; });
+ const er=expRange.value;
+ db.expenses.forEach(e=>{
+  if(!inRange(e.d,er)) return;
+  expenses.innerHTML+=`
+   <tr><td>${e.d}</td><td>${e.n}</td><td>${e.a.toFixed(2)}</td></tr>`;
+ });
 
+ // ---------- SUMMARY ----------
  const srng=sumRange.value;
  const fSales=db.sales.filter(x=>inRange(x.d,srng));
  const fExp=db.expenses.filter(x=>inRange(x.d,srng));
+
  const sRev=fSales.reduce((t,x)=>t+x.r,0);
  const sCost=fSales.reduce((t,x)=>t+x.q*(db.products.find(p=>p.name===x.n)?.buy||0),0);
  const sExp=fExp.reduce((t,x)=>t+x.a,0);
+
  cash.textContent=(sRev-sExp).toFixed(2);
  rev.textContent=sRev.toFixed(2);
- cost.textContent=sCost.toFixed(2);
  exp.textContent=sExp.toFixed(2);
  profit.textContent=(sRev-sCost-sExp).toFixed(2);
 }
