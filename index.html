@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KemiTech Supplies Limited</title>
+<meta name="description" content="Offline inventory system with sales history, stock movement history, expenses, time-based summaries, and cash/profit tracking. GitHub Pages compatible." />
+<style>
+:root{--p:#44033f;--d:#c0392b;--bg:#ec94e5;--c:#fff}
+*{box-sizing:border-box;font-family:system-ui,sans-serif}
+body{margin:0;background:var(--bg)}
+header{background:var(--p);color:#fff;padding:1rem 2rem}
+main{padding:2rem;max-width:1500px;margin:auto}
+.card{background:var(--c);padding:1.5rem;border-radius:10px;box-shadow:0 5px 15px rgba(0,0,0,.08);margin-bottom:1.5rem}
+.grid{display:grid;grid-template-columns:1fr 2fr;gap:2rem}
+label{display:block;margin-top:.6rem}
+input,select{width:100%;padding:.5rem;margin-top:.3rem}
+button{margin-top:1rem;padding:.5rem 1rem;border:0;border-radius:6px;cursor:pointer}
+.primary{background:var(--p);color:#fff}
+.danger{background:var(--d);color:#fff}
+table{width:100%;border-collapse:collapse;margin-top:.5rem}
+th,td{padding:.5rem;border-bottom:1px solid #ddd;font-size:.9rem}
+.small{font-size:.8rem;color:#666}
+.flex{display:flex;gap:1rem;flex-wrap:wrap}
+@media(max-width:900px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- LOCK SCREEN -->
+<div id="lock" style="position:fixed;inset:0;background:var(--p);display:flex;align-items:center;justify-content:center;z-index:9999">
+ <div style="background:#fff;padding:2rem;border-radius:10px;max-width:320px;width:100%">
+  <h3>KemiTech Login</h3>
+  <input type="password" id="pwd" placeholder="Password">
+  <button class="primary" style="width:100%" onclick="unlock()">Unlock</button>
+ </div>
+</div>
+
+<header><h1>KemiTech Supplies Limited</h1></header>
+<main>
+
+<!-- ADD / RESTOCK -->
+<div class="grid">
+<div class="card">
+<h3>Add / Restock Product</h3>
+<label>Search Existing Product<input id="psearch" oninput="fillProduct()"></label>
+<label>Product Name<input id="pname"></label>
+<label>Buy Price<input id="buy" type="number"></label>
+<label>Sell Price<input id="sell" type="number"></label>
+<label>Quantity<input id="stock" type="number"></label>
+<button class="primary" onclick="addOrRestock()">Save</button>
+<p class="small">Existing product = restock. New name = create product.</p>
+</div>
+
+<!-- PRODUCTS -->
+<div class="card">
+<h3>Products & Stock History</h3>
+<label>Search<input id="search" oninput="render()"></label>
+<table>
+<thead><tr><th>Product</th><th>Stock</th><th>Last Update</th><th>Stock Movement History</th><th>Remove</th></tr></thead>
+<tbody id="products"></tbody>
+</table>
+</div>
+</div>
+
+<!-- SALES -->
+<div class="card">
+<h3>Record Sale</h3>
+<label>Product<select id="sellProduct"></select></label>
+<label>Quantity<input id="sellQty" type="number"></label>
+<button class="primary" onclick="sellItem()">Record Sale</button>
+</div>
+
+<div class="card">
+<h3>Sales History</h3>
+<div class="flex">
+<input id="saleSearch" placeholder="Search product" oninput="render()">
+<select id="saleRange" onchange="render()">
+<option value="all">All</option>
+<option value="day">Today</option>
+<option value="week">This Week</option>
+<option value="month">This Month</option>
+</select>
+</div>
+<table>
+<thead><tr><th>Date</th><th>Product</th><th>Qty</th><th>Revenue</th><th>Profit</th></tr></thead>
+<tbody id="sales"></tbody>
+</table>
+</div>
+
+<!-- EXPENSES -->
+<div class="card">
+<h3>Expenses</h3>
+<div class="flex">
+<input id="expDesc" placeholder="Description">
+<input id="expAmt" type="number" placeholder="Amount">
+<button class="danger" onclick="addExpense()">Add</button>
+</div>
+<select id="expRange" onchange="render()">
+<option value="all">All</option>
+<option value="day">Today</option>
+<option value="week">This Week</option>
+<option value="month">This Month</option>
+</select>
+<table>
+<thead><tr><th>Date</th><th>Description</th><th>Amount</th></tr></thead>
+<tbody id="expenses"></tbody>
+</table>
+</div>
+
+<!-- SUMMARY -->
+<div class="card">
+<h3>Summary</h3>
+<select id="sumRange" onchange="render()">
+<option value="all">All Time</option>
+<option value="day">Today</option>
+<option value="week">This Week</option>
+<option value="month">This Month</option>
+</select>
+<p><strong>Available Cash:</strong> <span id="cash">0</span></p>
+<p>Revenue: <span id="rev">0</span></p>
+<p>Cost: <span id="cost">0</span></p>
+<p>Expenses: <span id="exp">0</span></p>
+<p><strong>Net Profit:</strong> <span id="profit">0</span></p>
+</div>
+
+</main>
+
+<script>
+const APP_PASSWORD='money@2026';
+function unlock(){ if(pwd.value===APP_PASSWORD) lock.style.display='none'; else alert('Wrong password'); }
+
+let db=JSON.parse(localStorage.getItem('KEMITECH_DB'))||{products:[],sales:[],expenses:[]};
+const save=()=>{localStorage.setItem('KEMITECH_DB',JSON.stringify(db));render();}
+const now=()=>new Date();
+const inRange=(d,r)=>{
+ const t=new Date(d),n=now();
+ if(r==='day') return t.toDateString()===n.toDateString();
+ if(r==='week') return (n-t)/(1000*60*60*24)<=7;
+ if(r==='month') return t.getMonth()===n.getMonth()&&t.getFullYear()===n.getFullYear();
+ return true;
+}
+
+function fillProduct(){ const q=psearch.value.toLowerCase(); const p=db.products.find(x=>x.name.toLowerCase()===q); if(p){pname.value=p.name;buy.value=p.buy;sell.value=p.sell;} }
+
+function addOrRestock(){
+ const name=pname.value.trim(); const qty=+stock.value; if(!name||qty<=0) return;
+ let p=db.products.find(x=>x.name.toLowerCase()===name.toLowerCase());
+ if(p){ p.stock+=qty; p.history.push({d:now().toLocaleString(),q:qty}); }
+ else{ if(+buy.value<=0||+sell.value<=0) return; db.products.push({name, buy:+buy.value, sell:+sell.value, stock:qty, history:[{d:now().toLocaleString(),q:qty}]}); }
+ pname.value=buy.value=sell.value=stock.value=psearch.value=''; save();
+}
+
+function sellItem(){
+ const i=sellProduct.value,q=+sellQty.value; if(!q) return;
+ const p=db.products[i]; if(q>p.stock) return alert('Low stock');
+ p.stock-=q; p.history.push({d:now().toLocaleString(),q:-q});
+ db.sales.unshift({d:now().toLocaleString(),n:p.name,q,r:q*p.sell,prof:q*(p.sell-p.buy)});
+ sellQty.value=''; save();
+}
+
+function addExpense(){ const a=+expAmt.value; if(a<=0) return; db.expenses.unshift({d:now().toLocaleString(),n:expDesc.value,a}); expDesc.value=expAmt.value=''; save(); }
+function removeProduct(i){ if(confirm('Delete product?')){ db.products.splice(i,1); save(); } }
+
+function render(){
+ products.innerHTML=''; sales.innerHTML=''; expenses.innerHTML=''; sellProduct.innerHTML='';
+ const ps=search.value.toLowerCase();
+ db.products.forEach((p,i)=>{
+  if(!p.name.toLowerCase().includes(ps)) return;
+  products.innerHTML+=`<tr><td>${p.name}</td><td>${p.stock}</td><td>${p.history.at(-1)?.d||''}</td><td>${p.history.map(h=>`${h.d}: ${h.q>0?'+'+h.q:h.q}`).join('<br>')}</td><td><button class="danger" onclick="removeProduct(${i})">X</button></td></tr>`;
+  sellProduct.innerHTML+=`<option value="${i}">${p.name}</option>`;
+ });
+
+ const sr=saleRange.value, ss=saleSearch.value.toLowerCase(); let rev=0,cost=0;
+ db.sales.forEach(x=>{ if(!x.n.toLowerCase().includes(ss)||!inRange(x.d,sr)) return;
+  sales.innerHTML+=`<tr><td>${x.d}</td><td>${x.n}</td><td>${x.q}</td><td>${x.r.toFixed(2)}</td><td>${x.prof.toFixed(2)}</td></tr>`;
+  rev+=x.r; cost+=x.q*(db.products.find(p=>p.name===x.n)?.buy||0);
+ });
+
+ const er=expRange.value; let expT=0;
+ db.expenses.forEach(e=>{ if(!inRange(e.d,er)) return; expenses.innerHTML+=`<tr><td>${e.d}</td><td>${e.n}</td><td>${e.a.toFixed(2)}</td></tr>`; expT+=e.a; });
+
+ const srng=sumRange.value;
+ const fSales=db.sales.filter(x=>inRange(x.d,srng));
+ const fExp=db.expenses.filter(x=>inRange(x.d,srng));
+ const sRev=fSales.reduce((t,x)=>t+x.r,0);
+ const sCost=fSales.reduce((t,x)=>t+x.q*(db.products.find(p=>p.name===x.n)?.buy||0),0);
+ const sExp=fExp.reduce((t,x)=>t+x.a,0);
+ cash.textContent=(sRev-sExp).toFixed(2);
+ rev.textContent=sRev.toFixed(2);
+ cost.textContent=sCost.toFixed(2);
+ exp.textContent=sExp.toFixed(2);
+ profit.textContent=(sRev-sCost-sExp).toFixed(2);
+}
+render();
+</script>
+</body>
+</html>
