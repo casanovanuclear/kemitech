@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>KemiTech Supplies Limited</title>
-<meta name="description" content="Offline inventory system with sales history, stock movement history, expenses, time-based summaries, and cash/profit tracking. GitHub Pages compatible." />
+<meta name="description" content="Offline inventory system with sales history, stock movement history, expenses, date-based summaries, and cloud sync." />
 <style>
 :root{--p:#44033f;--d:#c0392b;--bg:#ec94e5;--c:#fff}
 *{box-sizing:border-box;font-family:system-ui,sans-serif}
@@ -56,6 +56,12 @@ th,td{padding:.5rem;border-bottom:1px solid #ddd;font-size:.9rem}
 <div class="card">
 <h3>Products & Stock History</h3>
 <label>Search<input id="search" oninput="render()"></label>
+<select id="sumRange" onchange="render()">
+<option value="all">All Time</option>
+<option value="day">Today</option>
+<option value="week">This Week</option>
+<option value="month">This Month</option>
+</select>
 <table>
 <thead><tr><th>Product</th><th>Stock</th><th>Last Update</th><th>Stock Movement History</th><th>Remove</th></tr></thead>
 <tbody id="products"></tbody>
@@ -111,7 +117,7 @@ th,td{padding:.5rem;border-bottom:1px solid #ddd;font-size:.9rem}
 <!-- SUMMARY -->
 <div class="card">
 <h3>Summary</h3>
-<select id="sumRange" onchange="render()">
+<select id="summaryRange" onchange="render()">
 <option value="all">All Time</option>
 <option value="day">Today</option>
 <option value="week">This Week</option>
@@ -122,29 +128,65 @@ th,td{padding:.5rem;border-bottom:1px solid #ddd;font-size:.9rem}
 <p>Expenses: <span id="exp">0</span></p>
 <p><strong>Net Profit:</strong> <span id="profit">0</span></p>
 </div>
- <div class="card">
-  <h3>Reset Application</h3>
-  <button class="danger" onclick="resetApp()">Reset App</button>
-  <p class="small">This will delete all products, sales, and expenses permanently.</p>
-</div>
 
+<div class="card">
+<h3>Reset / Export</h3>
+<button class="danger" onclick="resetApp()">Reset App</button>
+<button class="primary" onclick="exportCSV('products')">Export Products</button>
+<button class="primary" onclick="exportCSV('sales')">Export Sales</button>
+<button class="primary" onclick="exportCSV('expenses')">Export Expenses</button>
+</div>
 
 </main>
 
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+
 <script>
+// ---------------- CONFIG ----------------
+const APP_PASSWORD='money@2026';
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "SENDER_ID",
+  appId: "APP_ID"
+};
+firebase.initializeApp(firebaseConfig);
+const dbCloud = firebase.firestore();
+
+// ---------------- LOCAL STORAGE ----------------
+let db=JSON.parse(localStorage.getItem('KEMITECH_DB'))||{products:[],sales:[],expenses:[]};
+const save=()=>{
+ localStorage.setItem('KEMITECH_DB',JSON.stringify(db));
+ syncCloud();
+ render();
+}
+
+// ---------------- CLOUD SYNC ----------------
+function syncCloud(){
+ dbCloud.collection("products").doc("data").set({items:db.products});
+ dbCloud.collection("sales").doc("data").set({items:db.sales});
+ dbCloud.collection("expenses").doc("data").set({items:db.expenses});
+}
+
+// ---------------- LOCK SCREEN ----------------
+function unlock(){ if(pwd.value===APP_PASSWORD) lock.style.display='none'; else alert('Wrong password'); }
+
+// ---------------- RESET ----------------
 function resetApp(){
- if(confirm('Are you sure you want to reset the app? This will delete all data permanently.')){
+ if(confirm('Are you sure?')){
   localStorage.removeItem('KEMITECH_DB');
-  location.reload();
+  db={products:[],sales:[],expenses:[]};
+  syncCloud();
+  render();
  }
 }
 
-const APP_PASSWORD='money@2026';
-function unlock(){ if(pwd.value===APP_PASSWORD) lock.style.display='none'; else alert('Wrong password'); }
-
-let db=JSON.parse(localStorage.getItem('KEMITECH_DB'))||{products:[],sales:[],expenses:[]};
-const save=()=>{localStorage.setItem('KEMITECH_DB',JSON.stringify(db));render();}
-const now=()=>new Date().toISOString();
+// ---------------- DATE HELPERS ----------------
+const todayDate=()=>new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 
 function inRange(d,r){
  const t=new Date(d), n=new Date();
@@ -154,7 +196,7 @@ function inRange(d,r){
  return true;
 }
 
-// ---------- PRODUCTS ----------
+// ---------------- PRODUCTS ----------------
 function fillProduct(){
  const q=psearch.value.toLowerCase();
  const p=db.products.find(x=>x.name.toLowerCase()===q);
@@ -165,100 +207,60 @@ function addOrRestock(){
  const name=pname.value.trim(), qty=+stock.value;
  if(!name||qty<=0) return;
  let p=db.products.find(x=>x.name.toLowerCase()===name.toLowerCase());
- if(p){
-  p.stock+=qty;
-  p.history.push({d:now(),q:qty});
- }else{
-  if(+buy.value<=0||+sell.value<=0) return;
-  db.products.push({
-   name, buy:+buy.value, sell:+sell.value,
-   stock:qty,
-   history:[{d:now(),q:qty}]
-  });
- }
+ if(p){ p.stock+=qty; p.history.push({d:todayDate(),q:qty}); }
+ else{ if(+buy.value<=0||+sell.value<=0) return; db.products.push({name, buy:+buy.value, sell:+sell.value, stock:qty, history:[{d:todayDate(),q:qty}]}); }
  pname.value=buy.value=sell.value=stock.value=psearch.value='';
  save();
 }
 
+// ---------------- SALES ----------------
 function sellItem(){
- const i=sellProduct.value, q=+sellQty.value;
+ const i=sellProduct.value,q=+sellQty.value;
  if(!q) return;
  const p=db.products[i];
  if(q>p.stock) return alert('Low stock');
-
- p.stock-=q;
- p.history.push({d:now(),q:-q});
-
- db.sales.unshift({
-  d:now(),
-  n:p.name,
-  q,
-  r:q*p.sell,
-  prof:q*(p.sell-p.buy)
- });
- sellQty.value='';
- save();
+ p.stock-=q; p.history.push({d:todayDate(),q:-q});
+ db.sales.unshift({d:todayDate(),n:p.name,q,r:q*p.sell,prof:q*(p.sell-p.buy)});
+ sellQty.value=''; save();
 }
 
-// ---------- EXPENSE ----------
+// ---------------- EXPENSES ----------------
 function addExpense(){
- const a=+expAmt.value;
- if(a<=0) return;
- db.expenses.unshift({d:now(),n:expDesc.value,a});
- expDesc.value=expAmt.value='';
- save();
+ const a=+expAmt.value; if(a<=0) return;
+ db.expenses.unshift({d:todayDate(),n:expDesc.value,a});
+ expDesc.value=expAmt.value=''; save();
 }
 
-function removeProduct(i){
- if(confirm('Delete product?')){
-  db.products.splice(i,1);
-  save();
- }
-}
+function removeProduct(i){ if(confirm('Delete product?')){ db.products.splice(i,1); save(); } }
 
-// ---------- RENDER ----------
+// ---------------- RENDER ----------------
 function render(){
- products.innerHTML='';
- sales.innerHTML='';
- expenses.innerHTML='';
- sellProduct.innerHTML='';
+ products.innerHTML=''; sales.innerHTML=''; expenses.innerHTML=''; sellProduct.innerHTML='';
 
- const ps=search.value.toLowerCase();
- const pr=sumRange.value;
-
+ const pr=sumRange.value || 'all';
  db.products.forEach((p,i)=>{
-  if(!p.name.toLowerCase().includes(ps)) return;
+  if(!p.name.toLowerCase().includes(search.value.toLowerCase())) return;
   const hist=p.history.filter(h=>inRange(h.d,pr));
-  products.innerHTML+=`
-   <tr>
-    <td>${p.name}</td>
-    <td>${p.stock}</td>
-    <td>${hist.at(-1)?.d||''}</td>
-    <td>${hist.map(h=>`${h.d}: ${h.q>0?'+'+h.q:h.q}`).join('<br>')}</td>
-    <td><button class="danger" onclick="removeProduct(${i})">X</button></td>
-   </tr>`;
+  products.innerHTML+=`<tr>
+   <td>${p.name}</td><td>${p.stock}</td><td>${hist.at(-1)?.d||''}</td>
+   <td>${hist.map(h=>`${h.d}: ${h.q>0?'+'+h.q:h.q}`).join('<br>')}</td>
+   <td><button class="danger" onclick="removeProduct(${i})">X</button></td>
+  </tr>`;
   sellProduct.innerHTML+=`<option value="${i}">${p.name}</option>`;
  });
 
- const sr=saleRange.value, ss=saleSearch.value.toLowerCase();
- db.sales.forEach(x=>{
-  if(!x.n.toLowerCase().includes(ss)||!inRange(x.d,sr)) return;
-  sales.innerHTML+=`
-   <tr>
-    <td>${x.d}</td><td>${x.n}</td><td>${x.q}</td>
-    <td>${x.r.toFixed(2)}</td><td>${x.prof.toFixed(2)}</td>
-   </tr>`;
+ db.sales.forEach(s=>{
+  if(!s.n.toLowerCase().includes(saleSearch.value.toLowerCase())||!inRange(s.d,saleRange.value)) return;
+  sales.innerHTML+=`<tr><td>${s.d}</td><td>${s.n}</td><td>${s.q}</td><td>${s.r.toFixed(2)}</td><td>${s.prof.toFixed(2)}</td></tr>`;
  });
 
- const er=expRange.value;
  db.expenses.forEach(e=>{
-  if(!inRange(e.d,er)) return;
-  expenses.innerHTML+=`
-   <tr><td>${e.d}</td><td>${e.n}</td><td>${e.a.toFixed(2)}</td></tr>`;
+  if(!inRange(e.d,expRange.value)) return;
+  expenses.innerHTML+=`<tr><td>${e.d}</td><td>${e.n}</td><td>${e.a.toFixed(2)}</td></tr>`;
  });
 
  // ---------- SUMMARY ----------
- const srng=sumRange.value;
+ const srng=summaryRange.value||'all';
  const fSales=db.sales.filter(x=>inRange(x.d,srng));
  const fExp=db.expenses.filter(x=>inRange(x.d,srng));
 
@@ -271,6 +273,18 @@ function render(){
  exp.textContent=sExp.toFixed(2);
  profit.textContent=(sRev-sCost-sExp).toFixed(2);
 }
+
+// ---------------- EXPORT CSV ----------------
+function exportCSV(type){
+ let rows=[], filename=type+'_'+todayDate()+'.csv';
+ if(type==='sales'){ rows=[['Date','Product','Qty','Revenue','Profit']]; db.sales.forEach(s=>rows.push([s.d,s.n,s.q,s.r,s.prof])); }
+ if(type==='expenses'){ rows=[['Date','Description','Amount']]; db.expenses.forEach(e=>rows.push([e.d,e.n,e.a])); }
+ if(type==='products'){ rows=[['Product','Stock','Buy','Sell']]; db.products.forEach(p=>rows.push([p.name,p.stock,p.buy,p.sell])); }
+ let csv=rows.map(r=>r.join(',')).join('\n');
+ let a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download=filename; a.click();
+}
+
+// INITIAL RENDER
 render();
 </script>
 
