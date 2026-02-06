@@ -123,10 +123,23 @@ th,td{padding:.5rem;border-bottom:1px solid #ddd;font-size:.9rem}
 <p>Expenses: <span id="exp">0</span></p>
 <p><strong>Net Profit:</strong> <span id="profit">0</span></p>
 </div>
+ <div class="card">
+  <h3>Reset Application</h3>
+  <button class="danger" onclick="resetApp()">Reset App</button>
+  <p class="small">This will delete all products, sales, and expenses permanently.</p>
+</div>
+
 
 </main>
 
 <script>
+ function resetApp() {
+  if(confirm('Are you sure you want to reset the app? This will delete all data permanently.')) {
+    localStorage.removeItem('KEMITECH_DB'); // delete the stored database
+    location.reload(); // refresh the page to start fresh
+  }
+}
+
 const APP_PASSWORD='money@2026';
 function unlock(){ if(pwd.value===APP_PASSWORD) lock.style.display='none'; else alert('Wrong password'); }
 
