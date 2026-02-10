@@ -156,12 +156,18 @@ footer{padding:1rem;text-align:center;color:#fff;background:var(--p);cursor:poin
 <button class="danger" onclick="adminResetLocal()">Reset LOCAL Data</button>
 <button class="danger" onclick="adminDeleteShared()">Delete SHARED Data</button>
 <button class="danger" onclick="adminResetApp()">Reset ENTIRE App</button>
+<button class="admin-only" onclick="removeProduct(i)">X</button>
+
 </div>
 
 </main>
 
 <script>
-const APP_PASSWORD='money@2026';
+    const ADMIN_PASSWORD = "admin123"; // change
+const USER_PASSWORD  = "user123";  // change
+
+let role = null; // 'admin' or 'user'
+
 const GIST_ID='a17292402f076ba0c5531f4144ef71b';
 const GITHUB_TOKEN='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';
 const GIST_FILE='kemitech-db.json';
@@ -173,14 +179,24 @@ let isAdmin=false;
 
 function today(){ return new Date().toISOString().split('T')[0]; }
 
-async function unlock(){
- if(pwd.value === APP_PASSWORD){
-  lock.style.display = 'none';
-  await loadFromGist(); // FORCE cloud sync
+function unlock(){
+ if(pwd.value === ADMIN_PASSWORD){
+  role = 'admin';
+ } else if(pwd.value === USER_PASSWORD){
+  role = 'user';
  } else {
   alert('Wrong password');
+  return;
  }
+
+ lock.style.display = 'none';
+ loadFromGist(); // shared data
 }
+function applyRoleUI(){
+ document.querySelectorAll('.admin-only')
+  .forEach(el => el.style.display = role === 'admin' ? 'block' : 'none');
+}
+applyRoleUI();
 
 function inRange(d,r){ const t=new Date(d), n=new Date(); if(r==='day') return t.toDateString()===n.toDateString(); if(r==='week') return (n-t)/86400000<=7; if(r==='month') return t.getMonth()===n.getMonth() && t.getFullYear()===n.getFullYear(); return true; }
 
@@ -266,7 +282,14 @@ function adminLogin(){ const pw=prompt("Admin password:"); if(pw===APP_PASSWORD)
 function adminResetLocal(){ if(!isAdmin) return alert("Admin only"); localStorage.removeItem('KEMITECH_DB'); db={products:[],sales:[],expenses:[]}; render(); alert("Local data cleared"); }
 async function adminDeleteShared(){ if(!isAdmin) return alert("Admin only"); const txt=prompt("Type DELETE to confirm:"); if(txt!=='DELETE') return; db={products:[],sales:[],expenses:[]}; await saveToGist(); alert("Shared database wiped"); }
 function adminResetApp(){ if(!isAdmin) return alert("Admin only"); if(!confirm("This will delete ALL products, sales, and expenses permanently. Are you sure?")) return; db={products:[],sales:[],expenses:[]}; localStorage.removeItem('KEMITECH_DB'); saveToGist(); alert("App has been completely reset!"); }
-
+function removeProduct(i){
+ if(role !== 'admin'){
+  alert('Admin only');
+  return;
+ }
+ db.products.splice(i,1);
+ saveToGist();
+}
 /* ========== INIT ========== */
 loadFromGist();
 </script>
