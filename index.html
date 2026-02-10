@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>KemiTech Supplies Limited</title>
+<meta name="description" content="Offline inventory system with sales history, stock movement history, expenses, date-based summaries, and cloud sync." />
+<style>
+:root{--p:#44033f;--d:#c0392b;--bg:#ec94e5;--c:#fff}
+*{box-sizing:border-box;font-family:system-ui,sans-serif}
+body{margin:0;background:var(--bg)}
+header{background:var(--p);color:#fff;padding:1rem 2rem}
+main{padding:2rem;max-width:1500px;margin:auto}
+.card{background:var(--c);padding:1.5rem;border-radius:10px;box-shadow:0 5px 15px rgba(0,0,0,.08);margin-bottom:1.5rem}
+.grid{display:grid;grid-template-columns:1fr 2fr;gap:2rem}
+label{display:block;margin-top:.6rem}
+input,select{width:100%;padding:.5rem;margin-top:.3rem}
+button{margin-top:1rem;padding:.5rem 1rem;border:0;border-radius:6px;cursor:pointer}
+.primary{background:var(--p);color:#fff}
+.danger{background:var(--d);color:#fff}
+table{width:100%;border-collapse:collapse;margin-top:.5rem}
+th,td{padding:.5rem;border-bottom:1px solid #ddd;font-size:.9rem}
+.small{font-size:.8rem;color:#666}
+.flex{display:flex;gap:1rem;flex-wrap:wrap}
+footer{padding:1rem;text-align:center;color:#fff;background:var(--p);cursor:pointer}
+@media(max-width:900px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- LOCK SCREEN -->
+<div id="lock" style="position:fixed;inset:0;background:var(--p);display:flex;align-items:center;justify-content:center;z-index:9999">
+ <div style="background:#fff;padding:2rem;border-radius:10px;max-width:320px;width:100%">
+  <h3>KemiTech Login</h3>
+  <input type="password" id="pwd" placeholder="Password">
+  <button class="primary" style="width:100%" onclick="unlock()">Unlock</button>
+ </div>
+</div>
+
+<header><h1>KemiTech Supplies Limited</h1></header>
+<main>
+
+<!-- CAPITAL & NET WORTH -->
+<div class="card" style="display:flex;justify-content:space-between;gap:1rem;">
+  <div style="flex:1;background:#f0f0f0;border:2px solid #2b9b4c;border-radius:10px;padding:1rem;text-align:center;">
+    <p><strong>Capital</strong></p>
+    <p style="font-size:1.5rem;color:#2b9b4c" id="capital">0</p>
+  </div>
+  <div style="flex:1;background:#f0f0f0;border:2px solid #c0392b;border-radius:10px;padding:1rem;text-align:center;">
+    <p><strong>Net Worth</strong></p>
+    <p style="font-size:1.5rem;color:#c0392b" id="networth">0</p>
+  </div>
+</div>
+
+<!-- ADD / RESTOCK -->
+<div class="grid">
+<div class="card">
+<h3>Add / Restock Product</h3>
+<label>Search Existing Product<input id="psearch" oninput="fillProduct()"></label>
+<label>Product Name<input id="pname"></label>
+<label>Buy Price<input id="buy" type="number"></label>
+<label>Sell Price<input id="sell" type="number"></label>
+<label>Quantity<input id="stock" type="number"></label>
+<button class="primary" onclick="addOrRestock()">Save</button>
+<p class="small">Existing product = restock. New name = create product.</p>
+</div>
+
+<!-- PRODUCTS -->
+<div class="card">
+<h3>Products & Stock History</h3>
+<label>Search<input id="search" oninput="render()"></label>
+<select id="sumRange" onchange="render()">
+<option value="all">All Time</option>
+<option value="day">Today</option>
+<option value="week">This Week</option>
+<option value="month">This Month</option>
+</select>
+<table>
+<thead><tr><th>Product</th><th>Stock</th><th>Last Update</th><th>Stock Movement History</th><th>Remove</th></tr></thead>
+<tbody id="products"></tbody>
+</table>
+</div>
+</div>
+
+<!-- SALES -->
+<div class="card">
+<h3>Record Sale</h3>
+<label>Product<select id="sellProduct"></select></label>
+<label>Quantity<input id="sellQty" type="number"></label>
+<button class="primary" onclick="sellItem()">Record Sale</button>
+</div>
+
+<div class="card">
+<h3>Sales History</h3>
+<div class="flex">
+<input id="saleSearch" placeholder="Search product" oninput="render()">
+<select id="saleRange" onchange="render()">
+<option value="all">All</option>
+<option value="day">Today</option>
+<option value="week">This Week</option>
+<option value="month">This Month</option>
+</select>
+</div>
+<table>
+<thead><tr><th>Date</th><th>Product</th><th>Qty</th><th>Revenue</th><th>Profit</th></tr></thead>
+<tbody id="sales"></tbody>
+</table>
+</div>
+
+<!-- EXPENSES -->
+<div class="card">
+<h3>Expenses</h3>
+<div class="flex">
+<input id="expDesc" placeholder="Description">
+<input id="expAmt" type="number" placeholder="Amount">
+<button class="danger" onclick="addExpense()">Add</button>
+</div>
+<select id="expRange" onchange="render()">
+<option value="all">All</option>
+<option value="day">Today</option>
+<option value="week">This Week</option>
+<option value="month">This Month</option>
+</select>
+<table>
+<thead><tr><th>Date</th><th>Description</th><th>Amount</th></tr></thead>
+<tbody id="expenses"></tbody>
+</table>
+</div>
+
+<!-- SUMMARY -->
+<div class="card">
+<h3>Summary</h3>
+<select id="summaryRange" onchange="render()">
+<option value="all">All Time</option>
+<option value="day">Today</option>
+<option value="week">This Week</option>
+<option value="month">This Month</option>
+</select>
+<p><strong>Available Cash:</strong> <span id="cash">0</span></p>
+<p>Revenue: <span id="rev">0</span></p>
+<p>Expenses: <span id="exp">0</span></p>
+<p><strong>Net Profit:</strong> <span id="profit">0</span></p>
+</div>
+
+<!-- EXPORT -->
+<div class="card">
+<h3>Export</h3>
+<button class="primary" onclick="exportCSV('products')">Export Products</button>
+<button class="primary" onclick="exportCSV('sales')">Export Sales</button>
+<button class="primary" onclick="exportCSV('expenses')">Export Expenses</button>
+</div>
+
+<!-- ADMIN PANEL -->
+<div class="card" id="adminPanel" style="display:none">
+<h3>ADMIN ONLY</h3>
+<button class="danger" onclick="adminResetLocal()">Reset LOCAL Data</button>
+<button class="danger" onclick="adminDeleteShared()">Delete SHARED Data</button>
+<button class="danger" onclick="adminResetApp()">Reset ENTIRE App</button>
+</div>
+
+</main>
+
+<script>
+const APP_PASSWORD='money@2026';
+const GIST_ID='a17292402f076ba0c5531f4144ef71b';
+const GITHUB_TOKEN='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';
+const GIST_FILE='kemitech-db.json';
+
+let db=JSON.parse(localStorage.getItem('KEMITECH_DB'))||{products:[],sales:[],expenses:[]};
+let isAdmin=false;
+
+function today(){ return new Date().toISOString().split('T')[0]; }
+function unlock(){ if(pwd.value===APP_PASSWORD) lock.style.display='none'; else alert('Wrong password'); }
+function inRange(d,r){ const t=new Date(d), n=new Date(); if(r==='day') return t.toDateString()===n.toDateString(); if(r==='week') return (n-t)/86400000<=7; if(r==='month') return t.getMonth()===n.getMonth() && t.getFullYear()===n.getFullYear(); return true; }
+
+/* ========== PRODUCTS ========== */
+function fillProduct(){ const p=db.products.find(x=>x.name.toLowerCase()===psearch.value.toLowerCase()); if(p){ pname.value=p.name; buy.value=p.buy; sell.value=p.sell; } }
+function addOrRestock(){ const name=pname.value.trim(), qty=+stock.value; if(!name||qty<=0) return; let p=db.products.find(x=>x.name.toLowerCase()===name.toLowerCase()); if(p){ p.stock+=qty; p.history.push({d:today(),q:qty}); } else{ db.products.push({name,buy:+buy.value,sell:+sell.value,stock:qty,history:[{d:today(),q:qty}]}); } pname.value=buy.value=sell.value=stock.value=psearch.value=''; saveToGist(); }
+function removeProduct(i){ if(confirm("Delete product?")){ db.products.splice(i,1); saveToGist(); } }
+
+/* ========== SALES ========== */
+function sellItem(){ const p=db.products[sellProduct.value], q=+sellQty.value; if(!p||q<=0||q>p.stock) return alert('Invalid sale'); p.stock-=q; p.history.push({d:today(),q:-q}); db.sales.unshift({d:today(),n:p.name,q,r:q*p.sell,prof:q*(p.sell-p.buy)}); sellQty.value=''; saveToGist(); }
+
+/* ========== EXPENSES ========== */
+function addExpense(){ const a=+expAmt.value; if(a<=0) return; db.expenses.unshift({d:today(),n:expDesc.value,a}); expDesc.value=expAmt.value=''; saveToGist(); }
+
+/* ========== RENDER ========== */
+function render(){
+ products.innerHTML=sales.innerHTML=expenses.innerHTML=sellProduct.innerHTML='';
+ const pr=sumRange.value;
+ db.products.forEach((p,i)=>{ const hist=p.history.filter(h=>inRange(h.d,pr)); products.innerHTML+=`<tr><td>${p.name}</td><td>${p.stock}</td><td>${hist.at(-1)?.d||''}</td><td>${hist.map(h=>h.q>0?'+'+h.q:h.q).join('<br>')}</td><td><button class="danger" onclick="removeProduct(${i})">X</button></td></tr>`; sellProduct.innerHTML+=`<option value="${i}">${p.name}</option>`; });
+ db.sales.filter(s=>inRange(s.d,saleRange.value)).forEach(s=>{ sales.innerHTML+=`<tr><td>${s.d}</td><td>${s.n}</td><td>${s.q}</td><td>${s.r}</td><td>${s.prof}</td></tr>`; });
+ db.expenses.filter(e=>inRange(e.d,expRange.value)).forEach(e=>{ expenses.innerHTML+=`<tr><td>${e.d}</td><td>${e.n}</td><td>${e.a}</td></tr>`; });
+
+ const fs=db.sales.filter(x=>inRange(x.d,summaryRange.value)), fe=db.expenses.filter(x=>inRange(x.d,summaryRange.value));
+ const revenue=fs.reduce((t,x)=>t+x.r,0), cost=fs.reduce((t,x)=>{ const p=db.products.find(p=>p.name===x.n); return t+(p?x.q*p.buy:0); },0), expense=fe.reduce((t,x)=>t+x.a,0);
+ cash.textContent=(revenue-expense).toFixed(2); rev.textContent=revenue.toFixed(2); exp.textContent=expense.toFixed(2); profit.textContent=(revenue-cost-expense).toFixed(2);
+
+ // Capital & Net Worth (top)
+ let capital=0, net=0; db.products.forEach(p=>{capital+=p.stock*p.buy; net+=p.stock*p.sell;});
+ document.getElementById("capital").textContent=capital.toFixed(2);
+ document.getElementById("networth").textContent=net.toFixed(2);
+}
+
+/* ========== CLOUD SYNC ========== */
+async function loadFromGist(){ const res=await fetch(`https://api.github.com/gists/${GIST_ID}`,{headers:{Authorization:`token ${GITHUB_TOKEN}`}}); const data=await res.json(); if(data.files[GIST_FILE]){ db=JSON.parse(data.files[GIST_FILE].content); localStorage.setItem('KEMITECH_DB',JSON.stringify(db)); } render(); }
+async function saveToGist(){ localStorage.setItem('KEMITECH_DB',JSON.stringify(db)); await fetch(`https://api.github.com/gists/${GIST_ID}`,{method:'PATCH',headers:{Authorization:`token ${GITHUB_TOKEN}`,'Content-Type':'application/json'},body:JSON.stringify({files:{[GIST_FILE]:{content:JSON.stringify(db,null,2)}}})}); render(); }
+
+/* ========== EXPORT ========== */
+function exportCSV(type){ let rows=[], filename=type+'_'+today()+'.csv';
+ if(type==='products'){ rows=[['Product','Stock','Buy','Sell']]; db.products.forEach(p=>rows.push([p.name,p.stock,p.buy,p.sell])); }
+ if(type==='sales'){ rows=[['Date','Product','Qty','Revenue','Profit']]; db.sales.forEach(s=>rows.push([s.d,s.n,s.q,s.r,s.prof])); }
+ if(type==='expenses'){ rows=[['Date','Description','Amount']]; db.expenses.forEach(e=>rows.push([e.d,e.n,e.a])); }
+ let csv=rows.map(r=>r.join(',')).join('\n'); let a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download=filename; a.click(); }
+
+/* ========== ADMIN ========== */
+function adminLogin(){ const pw=prompt("Admin password:"); if(pw===APP_PASSWORD){ isAdmin=true; alert("Admin enabled"); document.getElementById("adminPanel").style.display="block"; } else alert("Access denied"); }
+function adminResetLocal(){ if(!isAdmin) return alert("Admin only"); localStorage.removeItem('KEMITECH_DB'); db={products:[],sales:[],expenses:[]}; render(); alert("Local data cleared"); }
+async function adminDeleteShared(){ if(!isAdmin) return alert("Admin only"); const txt=prompt("Type DELETE to confirm:"); if(txt!=='DELETE') return; db={products:[],sales:[],expenses:[]}; await saveToGist(); alert("Shared database wiped"); }
+function adminResetApp(){ if(!isAdmin) return alert("Admin only"); if(!confirm("This will delete ALL products, sales, and expenses permanently. Are you sure?")) return; db={products:[],sales:[],expenses:[]}; localStorage.removeItem('KEMITECH_DB'); saveToGist(); alert("App has been completely reset!"); }
+
+/* ========== INIT ========== */
+loadFromGist();
+</script>
+
+<footer onclick="adminLogin()" style="opacity:.3;cursor:pointer;">© KemiTech</footer>
+</body>
+</html>
