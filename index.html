@@ -23,6 +23,7 @@ th,td{padding:.5rem;border-bottom:1px solid #ddd;font-size:.9rem}
 .small{font-size:.8rem;color:#666}
 .flex{display:flex;gap:1rem;flex-wrap:wrap}
 footer{padding:1rem;text-align:center;color:#fff;background:var(--p);cursor:pointer}
+.admin-only{display:none;}
 @media(max-width:900px){.grid{grid-template-columns:1fr}}
 </style>
 </head>
@@ -151,149 +152,174 @@ footer{padding:1rem;text-align:center;color:#fff;background:var(--p);cursor:poin
 </div>
 
 <!-- ADMIN PANEL -->
-<div class="card" id="adminPanel" style="display:none">
+<div class="card admin-only" id="adminPanel">
 <h3>ADMIN ONLY</h3>
 <button class="danger" onclick="adminResetLocal()">Reset LOCAL Data</button>
 <button class="danger" onclick="adminDeleteShared()">Delete SHARED Data</button>
 <button class="danger" onclick="adminResetApp()">Reset ENTIRE App</button>
-<button class="admin-only" onclick="removeProduct(i)">X</button>
-
 </div>
 
 </main>
 
 <script>
-    const ADMIN_PASSWORD = "admin123"; // change
-const USER_PASSWORD  = "user123";  // change
-
-let role = null; // 'admin' or 'user'
+const ADMIN_PASSWORD = "admin123";
+const USER_PASSWORD = "user123";
+let role = null;
+let isAdmin = false;
 
 const GIST_ID='a17292402f076ba0c5531f4144ef71b';
 const GITHUB_TOKEN='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';
 const GIST_FILE='kemitech-db.json';
 
 let cloudReady = false;
-
 let db = {products:[], sales:[], expenses:[]};
-let isAdmin=false;
 
 function today(){ return new Date().toISOString().split('T')[0]; }
 
 function unlock(){
- if(pwd.value === ADMIN_PASSWORD){
-  role = 'admin';
- } else if(pwd.value === USER_PASSWORD){
-  role = 'user';
- } else {
-  alert('Wrong password');
-  return;
- }
+  if(pwd.value === ADMIN_PASSWORD){ role='admin'; isAdmin=true; }
+  else if(pwd.value === USER_PASSWORD){ role='user'; isAdmin=false; }
+  else { alert('Wrong password'); return; }
 
- lock.style.display = 'none';
- loadFromGist(); // shared data
+  lock.style.display='none';
+  applyRoleUI();
+  loadFromGist();
 }
+
 function applyRoleUI(){
- document.querySelectorAll('.admin-only')
-  .forEach(el => el.style.display = role === 'admin' ? 'block' : 'none');
+  document.querySelectorAll('.admin-only').forEach(el => el.style.display = role==='admin'?'block':'none');
 }
-applyRoleUI();
 
-function inRange(d,r){ const t=new Date(d), n=new Date(); if(r==='day') return t.toDateString()===n.toDateString(); if(r==='week') return (n-t)/86400000<=7; if(r==='month') return t.getMonth()===n.getMonth() && t.getFullYear()===n.getFullYear(); return true; }
+function inRange(d,r){
+  const t=new Date(d), n=new Date();
+  if(r==='day') return t.toDateString()===n.toDateString();
+  if(r==='week') return (n-t)/86400000<=7;
+  if(r==='month') return t.getMonth()===n.getMonth() && t.getFullYear()===n.getFullYear();
+  return true;
+}
 
-/* ========== PRODUCTS ========== */
-function fillProduct(){ const p=db.products.find(x=>x.name.toLowerCase()===psearch.value.toLowerCase()); if(p){ pname.value=p.name; buy.value=p.buy; sell.value=p.sell; } }
-function addOrRestock(){ const name=pname.value.trim(), qty=+stock.value; if(!name||qty<=0) return; let p=db.products.find(x=>x.name.toLowerCase()===name.toLowerCase()); if(p){ p.stock+=qty; p.history.push({d:today(),q:qty}); } else{ db.products.push({name,buy:+buy.value,sell:+sell.value,stock:qty,history:[{d:today(),q:qty}]}); } pname.value=buy.value=sell.value=stock.value=psearch.value=''; saveToGist(); }
-function removeProduct(i){ if(confirm("Delete product?")){ db.products.splice(i,1); saveToGist(); } }
+/* PRODUCTS */
+function fillProduct(){
+  const p=db.products.find(x=>x.name.toLowerCase()===psearch.value.toLowerCase());
+  if(p){ pname.value=p.name; buy.value=p.buy; sell.value=p.sell; }
+}
+function addOrRestock(){
+  if(role!=='admin'){ alert("Read-only mode: cannot edit"); return; }
+  const name=pname.value.trim(), qty=+stock.value;
+  if(!name||qty<=0) return;
+  let p=db.products.find(x=>x.name.toLowerCase()===name.toLowerCase());
+  if(p){ p.stock+=qty; p.history.push({d:today(),q:qty}); }
+  else{ db.products.push({name,buy:+buy.value,sell:+sell.value,stock:qty,history:[{d:today(),q:qty}]}); }
+  pname.value=buy.value=sell.value=stock.value=psearch.value='';
+  saveToGist();
+}
+function removeProduct(i){
+  if(role!=='admin'){ alert("Read-only mode: cannot delete"); return; }
+  if(confirm("Delete product?")){ db.products.splice(i,1); saveToGist(); }
+}
 
-/* ========== SALES ========== */
-function sellItem(){ const p=db.products[sellProduct.value], q=+sellQty.value; if(!p||q<=0||q>p.stock) return alert('Invalid sale'); p.stock-=q; p.history.push({d:today(),q:-q}); db.sales.unshift({d:today(),n:p.name,q,r:q*p.sell,prof:q*(p.sell-p.buy)}); sellQty.value=''; saveToGist(); }
+/* SALES */
+function sellItem(){
+  if(role!=='admin'){ alert("Read-only mode: cannot record sales"); return; }
+  const p=db.products[sellProduct.value], q=+sellQty.value;
+  if(!p||q<=0||q>p.stock) return alert('Invalid sale');
+  p.stock-=q; p.history.push({d:today(),q:-q});
+  db.sales.unshift({d:today(),n:p.name,q,r:q*p.sell,prof:q*(p.sell-p.buy)});
+  sellQty.value='';
+  saveToGist();
+}
 
-/* ========== EXPENSES ========== */
-function addExpense(){ const a=+expAmt.value; if(a<=0) return; db.expenses.unshift({d:today(),n:expDesc.value,a}); expDesc.value=expAmt.value=''; saveToGist(); }
+/* EXPENSES */
+function addExpense(){
+  if(role!=='admin'){ alert("Read-only mode: cannot add expense"); return; }
+  const a=+expAmt.value;
+  if(a<=0) return;
+  db.expenses.unshift({d:today(),n:expDesc.value,a});
+  expDesc.value=expAmt.value='';
+  saveToGist();
+}
 
-/* ========== RENDER ========== */
+/* RENDER */
 function render(){
- products.innerHTML=sales.innerHTML=expenses.innerHTML=sellProduct.innerHTML='';
- const pr=sumRange.value;
- db.products.forEach((p,i)=>{ const hist=p.history.filter(h=>inRange(h.d,pr)); products.innerHTML+=`<tr><td>${p.name}</td><td>${p.stock}</td><td>${hist.at(-1)?.d||''}</td><td>${hist.map(h=>h.q>0?'+'+h.q:h.q).join('<br>')}</td><td><button class="danger" onclick="removeProduct(${i})">X</button></td></tr>`; sellProduct.innerHTML+=`<option value="${i}">${p.name}</option>`; });
- db.sales.filter(s=>inRange(s.d,saleRange.value)).forEach(s=>{ sales.innerHTML+=`<tr><td>${s.d}</td><td>${s.n}</td><td>${s.q}</td><td>${s.r}</td><td>${s.prof}</td></tr>`; });
- db.expenses.filter(e=>inRange(e.d,expRange.value)).forEach(e=>{ expenses.innerHTML+=`<tr><td>${e.d}</td><td>${e.n}</td><td>${e.a}</td></tr>`; });
-
- const fs=db.sales.filter(x=>inRange(x.d,summaryRange.value)), fe=db.expenses.filter(x=>inRange(x.d,summaryRange.value));
- const revenue=fs.reduce((t,x)=>t+x.r,0), cost=fs.reduce((t,x)=>{ const p=db.products.find(p=>p.name===x.n); return t+(p?x.q*p.buy:0); },0), expense=fe.reduce((t,x)=>t+x.a,0);
- cash.textContent=(revenue-expense).toFixed(2); rev.textContent=revenue.toFixed(2); exp.textContent=expense.toFixed(2); profit.textContent=(revenue-cost-expense).toFixed(2);
-
- // Capital & Net Worth (top)
- let capital=0, net=0; db.products.forEach(p=>{capital+=p.stock*p.buy; net+=p.stock*p.sell;});
- document.getElementById("capital").textContent=capital.toFixed(2);
- document.getElementById("networth").textContent=net.toFixed(2);
-}
-async function loadFromGist(){
- try{
-  const res = await fetch(`https://api.github.com/gists/${GIST_ID}`,{
-   headers:{Authorization:`token ${GITHUB_TOKEN}`}
+  products.innerHTML=sales.innerHTML=expenses.innerHTML=sellProduct.innerHTML='';
+  const pr=sumRange.value;
+  db.products.forEach((p,i)=>{
+    const hist=p.history.filter(h=>inRange(h.d,pr));
+    products.innerHTML+=`<tr>
+      <td>${p.name}</td>
+      <td>${p.stock}</td>
+      <td>${hist.at(-1)?.d||''}</td>
+      <td>${hist.map(h=>h.q>0?'+'+h.q:h.q).join('<br>')}</td>
+      <td>${role==='admin'?`<button class="danger admin-only" onclick="removeProduct(${i})">X</button>`:''}</td>
+    </tr>`;
+    sellProduct.innerHTML+=`<option value="${i}">${p.name}</option>`;
   });
-  const data = await res.json();
+  db.sales.filter(s=>inRange(s.d,saleRange.value)).forEach(s=>{
+    sales.innerHTML+=`<tr><td>${s.d}</td><td>${s.n}</td><td>${s.q}</td><td>${s.r}</td><td>${s.prof}</td></tr>`;
+  });
+  db.expenses.filter(e=>inRange(e.d,expRange.value)).forEach(e=>{
+    expenses.innerHTML+=`<tr><td>${e.d}</td><td>${e.n}</td><td>${e.a}</td></tr>`;
+  });
 
-  if(data.files && data.files[GIST_FILE]){
-   const cloudDB = JSON.parse(data.files[GIST_FILE].content || '{}');
+  const fs=db.sales.filter(x=>inRange(x.d,summaryRange.value)),
+        fe=db.expenses.filter(x=>inRange(x.d,summaryRange.value));
+  const revenue=fs.reduce((t,x)=>t+x.r,0),
+        cost=fs.reduce((t,x)=>{ const p=db.products.find(p=>p.name===x.n); return t+(p?x.q*p.buy:0); },0),
+        expense=fe.reduce((t,x)=>t+x.a,0);
 
-   // 🛡 If cloud has data, it wins ONLY ON FIRST LOAD
-   if(cloudDB.products?.length){
-    db = cloudDB;
-    localStorage.setItem('KEMITECH_DB', JSON.stringify(db));
-   }
-  }
+  cash.textContent=(revenue-expense).toFixed(2);
+  rev.textContent=revenue.toFixed(2);
+  exp.textContent=expense.toFixed(2);
+  profit.textContent=(revenue-cost-expense).toFixed(2);
 
-  cloudReady = true;   // ✅ VERY IMPORTANT
-  render();
- }catch(e){
-  cloudReady = true;   // still unlock app
-  render();
- }
+  let capital=0, net=0;
+  db.products.forEach(p=>{ capital+=p.stock*p.buy; net+=p.stock*p.sell; });
+  document.getElementById("capital").textContent=capital.toFixed(2);
+  document.getElementById("networth").textContent=net.toFixed(2);
+}
+
+/* CLOUD SYNC */
+async function loadFromGist(){
+  try{
+    const res = await fetch(`https://api.github.com/gists/${GIST_ID}`,{
+      headers:{Authorization:`token ${GITHUB_TOKEN}`}
+    });
+    const data = await res.json();
+    if(data.files && data.files[GIST_FILE]){
+      const cloudDB = JSON.parse(data.files[GIST_FILE].content || '{}');
+      if(cloudDB.products?.length) db = cloudDB;
+      localStorage.setItem('KEMITECH_DB',JSON.stringify(db));
+    }
+    cloudReady = true;
+    render();
+  }catch(e){ cloudReady = true; render(); }
 }
 
 async function saveToGist(){
- if(!cloudReady) return; // 🛑 STOP EARLY SAVE
-
- localStorage.setItem('KEMITECH_DB',JSON.stringify(db));
- await fetch(`https://api.github.com/gists/${GIST_ID}`,{
-  method:'PATCH',
-  headers:{
-   Authorization:`token ${GITHUB_TOKEN}`,
-   'Content-Type':'application/json'
-  },
-  body:JSON.stringify({
-   files:{[GIST_FILE]:{content:JSON.stringify(db,null,2)}}
-  })
- });
- render();
+  if(!cloudReady || role!=='admin') return;
+  localStorage.setItem('KEMITECH_DB',JSON.stringify(db));
+  await fetch(`https://api.github.com/gists/${GIST_ID}`,{
+    method:'PATCH',
+    headers:{Authorization:`token ${GITHUB_TOKEN}`, 'Content-Type':'application/json'},
+    body:JSON.stringify({files:{[GIST_FILE]:{content:JSON.stringify(db,null,2)}}})
+  });
+  render();
 }
 
-/* ========== EXPORT ========== */
-function exportCSV(type){ let rows=[], filename=type+'_'+today()+'.csv';
- if(type==='products'){ rows=[['Product','Stock','Buy','Sell']]; db.products.forEach(p=>rows.push([p.name,p.stock,p.buy,p.sell])); }
- if(type==='sales'){ rows=[['Date','Product','Qty','Revenue','Profit']]; db.sales.forEach(s=>rows.push([s.d,s.n,s.q,s.r,s.prof])); }
- if(type==='expenses'){ rows=[['Date','Description','Amount']]; db.expenses.forEach(e=>rows.push([e.d,e.n,e.a])); }
- let csv=rows.map(r=>r.join(',')).join('\n'); let a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download=filename; a.click(); }
-
-/* ========== ADMIN ========== */
-function adminLogin(){ const pw=prompt("Admin password:"); if(pw===APP_PASSWORD){ isAdmin=true; alert("Admin enabled"); document.getElementById("adminPanel").style.display="block"; } else alert("Access denied"); }
-function adminResetLocal(){ if(!isAdmin) return alert("Admin only"); localStorage.removeItem('KEMITECH_DB'); db={products:[],sales:[],expenses:[]}; render(); alert("Local data cleared"); }
-async function adminDeleteShared(){ if(!isAdmin) return alert("Admin only"); const txt=prompt("Type DELETE to confirm:"); if(txt!=='DELETE') return; db={products:[],sales:[],expenses:[]}; await saveToGist(); alert("Shared database wiped"); }
-function adminResetApp(){ if(!isAdmin) return alert("Admin only"); if(!confirm("This will delete ALL products, sales, and expenses permanently. Are you sure?")) return; db={products:[],sales:[],expenses:[]}; localStorage.removeItem('KEMITECH_DB'); saveToGist(); alert("App has been completely reset!"); }
-function removeProduct(i){
- if(role !== 'admin'){
-  alert('Admin only');
-  return;
- }
- db.products.splice(i,1);
- saveToGist();
+/* EXPORT */
+function exportCSV(type){
+  let rows=[], filename=type+'_'+today()+'.csv';
+  if(type==='products'){ rows=[['Product','Stock','Buy','Sell']]; db.products.forEach(p=>rows.push([p.name,p.stock,p.buy,p.sell])); }
+  if(type==='sales'){ rows=[['Date','Product','Qty','Revenue','Profit']]; db.sales.forEach(s=>rows.push([s.d,s.n,s.q,s.r,s.prof])); }
+  if(type==='expenses'){ rows=[['Date','Description','Amount']]; db.expenses.forEach(e=>rows.push([e.d,e.n,e.a])); }
+  let csv=rows.map(r=>r.join(',')).join('\n');
+  let a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download=filename;
+  a.click();
 }
-/* ========== INIT ========== */
-loadFromGist();
 </script>
 
-<footer onclick="adminLogin()" style="opacity:.3;cursor:pointer;">© KemiTech</footer>
+<footer style="opacity:.3;cursor:pointer;">© KemiTech</footer>
 </body>
 </html>
