@@ -166,10 +166,13 @@ const GIST_ID='a17292402f076ba0c5531f4144ef71b';
 const GITHUB_TOKEN='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';
 const GIST_FILE='kemitech-db.json';
 
+let cloudReady = false;
+
 let db = {products:[], sales:[], expenses:[]};
 let isAdmin=false;
 
 function today(){ return new Date().toISOString().split('T')[0]; }
+
 async function unlock(){
  if(pwd.value === APP_PASSWORD){
   lock.style.display = 'none';
@@ -215,45 +218,39 @@ async function loadFromGist(){
    headers:{Authorization:`token ${GITHUB_TOKEN}`}
   });
   const data = await res.json();
-  if(!data.files || !data.files[GIST_FILE]) return;
 
-  const cloudDB = JSON.parse(data.files[GIST_FILE].content || '{}');
+  if(data.files && data.files[GIST_FILE]){
+   const cloudDB = JSON.parse(data.files[GIST_FILE].content || '{}');
 
-  // 🛡 SAFE GUARD: do NOT overwrite richer local data
-  const localSize = JSON.stringify(db).length;
-  const cloudSize = JSON.stringify(cloudDB).length;
-
-  if(cloudSize > localSize){
-   db = cloudDB;
-   localStorage.setItem('KEMITECH_DB', JSON.stringify(db));
+   // 🛡 If cloud has data, it wins ONLY ON FIRST LOAD
+   if(cloudDB.products?.length){
+    db = cloudDB;
+    localStorage.setItem('KEMITECH_DB', JSON.stringify(db));
+   }
   }
 
+  cloudReady = true;   // ✅ VERY IMPORTANT
   render();
  }catch(e){
-  console.warn('Cloud sync skipped:', e);
+  cloudReady = true;   // still unlock app
   render();
  }
 }
 
-
 async function saveToGist(){
- localStorage.setItem('KEMITECH_DB', JSON.stringify(db));
+ if(!cloudReady) return; // 🛑 STOP EARLY SAVE
 
- await fetch(`https://api.github.com/gists/${GIST_ID}`, {
-  method: 'PATCH',
+ localStorage.setItem('KEMITECH_DB',JSON.stringify(db));
+ await fetch(`https://api.github.com/gists/${GIST_ID}`,{
+  method:'PATCH',
   headers:{
    Authorization:`token ${GITHUB_TOKEN}`,
    'Content-Type':'application/json'
   },
-  body: JSON.stringify({
-   files:{
-    [GIST_FILE]:{
-     content: JSON.stringify(db, null, 2)
-    }
-   }
+  body:JSON.stringify({
+   files:{[GIST_FILE]:{content:JSON.stringify(db,null,2)}}
   })
  });
-
  render();
 }
 
