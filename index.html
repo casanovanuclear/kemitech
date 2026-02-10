@@ -162,8 +162,8 @@ footer{padding:1rem;text-align:center;color:#fff;background:var(--p);cursor:poin
 </main>
 
 <script>
-const ADMIN_PASSWORD = "nonstop@24";
-const USER_PASSWORD  = "money@2026";
+const ADMIN_PASSWORD = "admin123";
+const USER_PASSWORD  = "user123";
 
 let role = null; // 'admin' or 'user'
 const GIST_ID='a17292402f076ba0c5531f4144ef71b';
@@ -248,30 +248,57 @@ function render(){
 
 // ====== CLOUD SYNC ======
 async function loadFromGist(){
- try{
-  const res = await fetch(`https://api.github.com/gists/${GIST_ID}`,{headers:{Authorization:`token ${GITHUB_TOKEN}`}});
-  const data = await res.json();
-  if(data.files && data.files[GIST_FILE]){
-   const cloudDB = JSON.parse(data.files[GIST_FILE].content || '{}');
-   // Merge: only if cloud has data
-   if(cloudDB.products?.length) db = cloudDB;
-   localStorage.setItem('KEMITECH_DB', JSON.stringify(db));
-  }
-  cloudReady = true;
-  render();
- }catch(e){ cloudReady = true; render(); }
-}
-async function saveToGist(){
- if(!cloudReady) return;
- localStorage.setItem('KEMITECH_DB',JSON.stringify(db));
- await fetch(`https://api.github.com/gists/${GIST_ID}`,{
-  method:'PATCH',
-  headers:{Authorization:`token ${GITHUB_TOKEN}`,'Content-Type':'application/json'},
-  body:JSON.stringify({files:{[GIST_FILE]:{content:JSON.stringify(db,null,2)}}})
- });
- render();
-}
+    try {
+        const res = await fetch(`https://api.github.com/gists/${GIST_ID}`,{
+            headers:{Authorization:`token ${GITHUB_TOKEN}`}
+        });
+        const data = await res.json();
 
+        let cloudDB = {products:[], sales:[], expenses:[]};
+        if(data.files && data.files[GIST_FILE]){
+            cloudDB = JSON.parse(data.files[GIST_FILE].content || '{}');
+        }
+
+        // Load local DB
+        const localDB = JSON.parse(localStorage.getItem('KEMITECH_DB') || '{"products":[],"sales":[],"expenses":[]}');
+
+        // Merge products by name
+        const mergedProducts = [...localDB.products];
+        cloudDB.products.forEach(cp=>{
+            const lp = mergedProducts.find(p=>p.name===cp.name);
+            if(lp){
+                lp.stock = Math.max(lp.stock, cp.stock); // keep highest stock
+                lp.history = [...lp.history, ...cp.history.filter(h=>!lp.history.find(x=>x.d===h.d && x.q===h.q))];
+            } else mergedProducts.push(cp);
+        });
+
+        // Merge sales: avoid duplicates
+        const mergedSales = [...localDB.sales];
+        cloudDB.sales.forEach(cs=>{
+            if(!mergedSales.find(s=>s.d===cs.d && s.n===cs.n && s.q===cs.q)) mergedSales.push(cs);
+        });
+
+        // Merge expenses: avoid duplicates
+        const mergedExpenses = [...localDB.expenses];
+        cloudDB.expenses.forEach(ce=>{
+            if(!mergedExpenses.find(e=>e.d===ce.d && e.n===ce.n && e.a===ce.a)) mergedExpenses.push(ce);
+        });
+
+        // Final merged DB
+        db = {products: mergedProducts, sales: mergedSales, expenses: mergedExpenses};
+
+        // Save merged DB locally
+        localStorage.setItem('KEMITECH_DB', JSON.stringify(db));
+
+        cloudReady = true;
+        render();
+        await saveToGist(); // push merged data back to cloud
+    } catch(e){
+        console.error(e);
+        cloudReady = true;
+        render();
+    }
+}
 // ====== EXPORT ======
 function exportCSV(type){ let rows=[], filename=type+'_'+today()+'.csv';
  if(type==='products'){ rows=[['Product','Stock','Buy','Sell']]; db.products.forEach(p=>rows.push([p.name,p.stock,p.buy,p.sell])); }
