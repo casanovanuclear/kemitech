@@ -23,7 +23,6 @@ th,td{padding:.5rem;border-bottom:1px solid #ddd;font-size:.9rem}
 .small{font-size:.8rem;color:#666}
 .flex{display:flex;gap:1rem;flex-wrap:wrap}
 footer{padding:1rem;text-align:center;color:#fff;background:var(--p);cursor:pointer}
-.admin-only{display:none;}
 @media(max-width:900px){.grid{grid-template-columns:1fr}}
 </style>
 </head>
@@ -57,12 +56,12 @@ footer{padding:1rem;text-align:center;color:#fff;background:var(--p);cursor:poin
 <div class="grid">
 <div class="card">
 <h3>Add / Restock Product</h3>
-<label>Search Existing Product<input id="psearch" oninput="fillProduct()" readonly></label>
-<label>Product Name<input id="pname" readonly></label>
-<label>Buy Price<input id="buy" type="number" readonly></label>
-<label>Sell Price<input id="sell" type="number" readonly></label>
-<label>Quantity<input id="stock" type="number" readonly></label>
-<button class="primary" id="saveBtn" onclick="addOrRestock()" disabled>Save</button>
+<label>Search Existing Product<input id="psearch" oninput="fillProduct()"></label>
+<label>Product Name<input id="pname"></label>
+<label>Buy Price<input id="buy" type="number"></label>
+<label>Sell Price<input id="sell" type="number"></label>
+<label>Quantity<input id="stock" type="number"></label>
+<button class="primary" onclick="addOrRestock()">Save</button>
 <p class="small">Existing product = restock. New name = create product.</p>
 </div>
 
@@ -77,7 +76,7 @@ footer{padding:1rem;text-align:center;color:#fff;background:var(--p);cursor:poin
 <option value="month">This Month</option>
 </select>
 <table>
-<thead><tr><th>Product</th><th>Stock</th><th>Last Update</th><th>Stock Movement History</th><th class="admin-only">Remove</th></tr></thead>
+<thead><tr><th>Product</th><th>Stock</th><th>Last Update</th><th>Stock Movement History</th><th>Remove</th></tr></thead>
 <tbody id="products"></tbody>
 </table>
 </div>
@@ -86,9 +85,9 @@ footer{padding:1rem;text-align:center;color:#fff;background:var(--p);cursor:poin
 <!-- SALES -->
 <div class="card">
 <h3>Record Sale</h3>
-<label>Product<select id="sellProduct" disabled></select></label>
-<label>Quantity<input id="sellQty" type="number" readonly></label>
-<button class="primary" id="sellBtn" onclick="sellItem()" disabled>Record Sale</button>
+<label>Product<select id="sellProduct"></select></label>
+<label>Quantity<input id="sellQty" type="number"></label>
+<button class="primary" onclick="sellItem()">Record Sale</button>
 </div>
 
 <div class="card">
@@ -112,9 +111,9 @@ footer{padding:1rem;text-align:center;color:#fff;background:var(--p);cursor:poin
 <div class="card">
 <h3>Expenses</h3>
 <div class="flex">
-<input id="expDesc" placeholder="Description" readonly>
-<input id="expAmt" type="number" placeholder="Amount" readonly>
-<button class="danger" id="expBtn" onclick="addExpense()" disabled>Add</button>
+<input id="expDesc" placeholder="Description">
+<input id="expAmt" type="number" placeholder="Amount">
+<button class="danger" onclick="addExpense()">Add</button>
 </div>
 <select id="expRange" onchange="render()">
 <option value="all">All</option>
@@ -152,7 +151,7 @@ footer{padding:1rem;text-align:center;color:#fff;background:var(--p);cursor:poin
 </div>
 
 <!-- ADMIN PANEL -->
-<div class="card admin-only" id="adminPanel">
+<div class="card" id="adminPanel" style="display:none">
 <h3>ADMIN ONLY</h3>
 <button class="danger" onclick="adminResetLocal()">Reset LOCAL Data</button>
 <button class="danger" onclick="adminDeleteShared()">Delete SHARED Data</button>
@@ -160,161 +159,364 @@ footer{padding:1rem;text-align:center;color:#fff;background:var(--p);cursor:poin
 </div>
 
 </main>
-
 <script>
 const ADMIN_PASSWORD = "nonstop@24";
 const USER_PASSWORD  = "money@2026";
 
-let role = null; // 'admin' or 'user'
+let role = null;
+
 const GIST_ID='a17292402f076ba0c5531f4144ef71b';
 const GITHUB_TOKEN='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';
-const GIST_FILE='kemitech-db.json';
+const GIST_FILE = "kemitech-db.json";
 
-let cloudReady = false;
-let db = {products:[], sales:[], expenses:[]};
+let db = { products: [], sales: [], expenses: [] };
 
-function today(){ return new Date().toISOString().split('T')[0]; }
+function today(){
+  return new Date().toISOString().split('T')[0];
+}
 
-// ====== INITIALIZE LOCAL DB ======
-function initDB() {
-  const local = localStorage.getItem('KEMITECH_DB');
+/* ================= INIT ================= */
+
+function initDB(){
+  const local = localStorage.getItem("KEMITECH_DB");
   if(local){
-    try { db = JSON.parse(local); } catch(e){ db={products:[], sales:[], expenses:[]}; }
-  } else {
-    db={products:[], sales:[], expenses:[]};
+    db = JSON.parse(local);
   }
   render();
 }
 
-// ====== LOGIN ======
+/* ================= LOGIN ================= */
+
 function unlock(){
- if(pwd.value === ADMIN_PASSWORD){ role='admin'; }
- else if(pwd.value === USER_PASSWORD){ role='user'; }
- else { alert('Wrong password'); return; }
+  if(pwd.value === ADMIN_PASSWORD){
+    role = "admin";
+  }
+  else if(pwd.value === USER_PASSWORD){
+    role = "user";
+  }
+  else{
+    alert("Wrong password");
+    return;
+  }
 
- lock.style.display = 'none';
- applyRoleUI();
- initDB();
- loadFromGist();
+  lock.style.display = "none";
+  applyRoleUI();
+  loadFromGist();
 }
 
-// ====== ROLE UI ======
+/* ================= ROLE ================= */
+
 function applyRoleUI(){
- document.querySelectorAll('.admin-only').forEach(el=>el.style.display=role==='admin'?'block':'none');
- document.getElementById('pname').readOnly = role!=='admin';
- document.getElementById('buy').readOnly = role!=='admin';
- document.getElementById('sell').readOnly = role!=='admin';
- document.getElementById('stock').readOnly = role!=='admin';
- document.getElementById('saveBtn').disabled = role!=='admin';
- document.getElementById('sellProduct').disabled = role!=='admin';
- document.getElementById('sellQty').readOnly = role!=='admin';
- document.getElementById('sellBtn').disabled = role!=='admin';
- document.getElementById('expDesc').readOnly = role!=='admin';
- document.getElementById('expAmt').readOnly = role!=='admin';
- document.getElementById('expBtn').disabled = role!=='admin';
+  document.getElementById("adminPanel").style.display =
+  role === "admin" ? "block" : "none";
+
+
+  document.querySelectorAll('.admin-only')
+    .forEach(el => el.style.display = role === "admin" ? "block" : "none");
+
+  const allowEdit = true; // both admin and user can add
+
+  document.getElementById('pname').readOnly = !allowEdit;
+  document.getElementById('buy').readOnly = !allowEdit;
+  document.getElementById('sell').readOnly = !allowEdit;
+  document.getElementById('stock').readOnly = !allowEdit;
+  document.getElementById('saveBtn').disabled = !allowEdit;
+
+  document.getElementById('sellProduct').disabled = !allowEdit;
+  document.getElementById('sellQty').readOnly = !allowEdit;
+  document.getElementById('sellBtn').disabled = !allowEdit;
+
+  document.getElementById('expDesc').readOnly = !allowEdit;
+  document.getElementById('expAmt').readOnly = !allowEdit;
+  document.getElementById('expBtn').disabled = !allowEdit;
 }
 
-// ====== IN RANGE ======
-function inRange(d,r){ const t=new Date(d), n=new Date(); if(r==='day') return t.toDateString()===n.toDateString(); if(r==='week') return (n-t)/86400000<=7; if(r==='month') return t.getMonth()===n.getMonth() && t.getFullYear()===n.getFullYear(); return true; }
+/* ================= RANGE ================= */
 
-// ====== PRODUCTS ======
-function fillProduct(){ const p=db.products.find(x=>x.name.toLowerCase()===psearch.value.toLowerCase()); if(p){ pname.value=p.name; buy.value=p.buy; sell.value=p.sell; } }
-function addOrRestock(){ if(role!=='admin') return alert('Admin only'); const name=pname.value.trim(), qty=+stock.value; if(!name||qty<=0) return; let p=db.products.find(x=>x.name.toLowerCase()===name.toLowerCase()); if(p){ p.stock+=qty; p.history.push({d:today(),q:qty}); } else{ db.products.push({name,buy:+buy.value,sell:+sell.value,stock:qty,history:[{d:today(),q:qty}]}); } pname.value=buy.value=sell.value=stock.value=psearch.value=''; saveToGist(); }
-function removeProduct(i){ if(role!=='admin') return alert('Admin only'); if(confirm("Delete product?")){ db.products.splice(i,1); saveToGist(); } }
+function inRange(d,r){
+  const t=new Date(d), n=new Date();
+  if(r==='day') return t.toDateString()===n.toDateString();
+  if(r==='week') return (n-t)/86400000<=7;
+  if(r==='month') return t.getMonth()===n.getMonth() && t.getFullYear()===n.getFullYear();
+  return true;
+}
 
-// ====== SALES ======
-function sellItem(){ if(role!=='admin') return alert('Admin only'); const p=db.products[sellProduct.value], q=+sellQty.value; if(!p||q<=0||q>p.stock) return alert('Invalid sale'); p.stock-=q; p.history.push({d:today(),q:-q}); db.sales.unshift({d:today(),n:p.name,q,r:q*p.sell,prof:q*(p.sell-p.buy)}); sellQty.value=''; saveToGist(); }
+/* ================= PRODUCTS ================= */
 
-// ====== EXPENSES ======
-function addExpense(){ if(role!=='admin') return alert('Admin only'); const a=+expAmt.value; if(a<=0) return; db.expenses.unshift({d:today(),n:expDesc.value,a}); expDesc.value=expAmt.value=''; saveToGist(); }
+function addOrRestock(){
+  const name = pname.value.trim();
+  const qty = +stock.value;
+  if(!name || qty<=0) return;
 
-// ====== RENDER ======
+  let p = db.products.find(x => x.name.toLowerCase()===name.toLowerCase());
+
+  if(p){
+    p.stock += qty;
+    p.history.push({d:today(), q:qty});
+  }else{
+    db.products.push({
+      name,
+      buy:+buy.value,
+      sell:+sell.value,
+      stock:qty,
+      history:[{d:today(), q:qty}]
+    });
+  }
+
+  clearProductForm();
+  saveToCloud();
+
+  function clearProductForm(){
+  pname.value="";
+  buy.value="";
+  sell.value="";
+  stock.value="";
+  psearch.value="";
+}
+
+}
+
+function removeProduct(i){
+  if(role !== "admin"){
+    alert("Admin only");
+    return;
+  }
+  db.products.splice(i,1);
+  saveToCloud();
+}
+
+/* ================= SALES ================= */
+
+function sellItem(){
+  const p = db.products[sellProduct.value];
+  const q = +sellQty.value;
+
+  if(!p || q<=0 || q>p.stock){
+    alert("Invalid sale");
+    return;
+  }
+
+  p.stock -= q;
+  p.history.push({d:today(), q:-q});
+
+  db.sales.unshift({
+    d:today(),
+    n:p.name,
+    q,
+    r:q*p.sell,
+    prof:q*(p.sell-p.buy)
+  });
+
+  sellQty.value="";
+  saveToCloud();
+}
+
+/* ================= EXPENSES ================= */
+
+function addExpense(){
+  const amt = +expAmt.value;
+  if(amt<=0) return;
+
+  db.expenses.unshift({
+    d:today(),
+    n:expDesc.value,
+    a:amt
+  });
+
+  expDesc.value="";
+  expAmt.value="";
+  saveToCloud();
+}
+
+/* ================= RENDER ================= */
+
 function render(){
- products.innerHTML=sales.innerHTML=expenses.innerHTML=sellProduct.innerHTML='';
- const pr=sumRange.value;
- db.products.forEach((p,i)=>{ const hist=p.history.filter(h=>inRange(h.d,pr)); products.innerHTML+=`<tr><td>${p.name}</td><td>${p.stock}</td><td>${hist.at(-1)?.d||''}</td><td>${hist.map(h=>h.q>0?'+'+h.q:h.q).join('<br>')}</td><td class="admin-only"><button class="danger" onclick="removeProduct(${i})">X</button></td></tr>`; sellProduct.innerHTML+=`<option value="${i}">${p.name}</option>`; });
- db.sales.filter(s=>inRange(s.d,saleRange.value)).forEach(s=>{ sales.innerHTML+=`<tr><td>${s.d}</td><td>${s.n}</td><td>${s.q}</td><td>${s.r}</td><td>${s.prof}</td></tr>`; });
- db.expenses.filter(e=>inRange(e.d,expRange.value)).forEach(e=>{ expenses.innerHTML+=`<tr><td>${e.d}</td><td>${e.n}</td><td>${e.a}</td></tr>`; });
 
- const fs=db.sales.filter(x=>inRange(x.d,summaryRange.value)), fe=db.expenses.filter(x=>inRange(x.d,summaryRange.value));
- const revenue=fs.reduce((t,x)=>t+x.r,0), cost=fs.reduce((t,x)=>{ const p=db.products.find(p=>p.name===x.n); return t+(p?x.q*p.buy:0); },0), expense=fe.reduce((t,x)=>t+x.a,0);
- cash.textContent=(revenue-expense).toFixed(2); rev.textContent=revenue.toFixed(2); exp.textContent=expense.toFixed(2); profit.textContent=(revenue-cost-expense).toFixed(2);
+  products.innerHTML="";
+  sales.innerHTML="";
+  expenses.innerHTML="";
+  sellProduct.innerHTML="";
 
- let capital=0, net=0; db.products.forEach(p=>{capital+=p.stock*p.buy; net+=p.stock*p.sell;});
- document.getElementById("capital").textContent=capital.toFixed(2);
- document.getElementById("networth").textContent=net.toFixed(2);
- applyRoleUI();
-}
+  /* ================= PRODUCTS ================= */
 
-// ====== CLOUD SYNC ======
-async function loadFromGist(){
-    try {
-        const res = await fetch(`https://api.github.com/gists/${GIST_ID}`,{
-            headers:{Authorization:`token ${GITHUB_TOKEN}`}
-        });
-        const data = await res.json();
+  db.products.forEach((p,i)=>{
 
-        let cloudDB = {products:[], sales:[], expenses:[]};
-        if(data.files && data.files[GIST_FILE]){
-            cloudDB = JSON.parse(data.files[GIST_FILE].content || '{}');
-        }
+    products.innerHTML += `
+    <tr>
+      <td>${p.name}</td>
+      <td>${p.stock}</td>
+      <td>${p.history?.at(-1)?.d||''}</td>
+      <td>${p.history?.map(h=>h.q).join("<br>")||''}</td>
+      <td class="admin-only">
+        <button class="danger" onclick="removeProduct(${i})">X</button>
+      </td>
+    </tr>`;
 
-        // Load local DB
-        const localDB = JSON.parse(localStorage.getItem('KEMITECH_DB') || '{"products":[],"sales":[],"expenses":[]}');
+    sellProduct.innerHTML += `<option value="${i}">${p.name}</option>`;
+  });
 
-        // Merge products by name
-        const mergedProducts = [...localDB.products];
-        cloudDB.products.forEach(cp=>{
-            const lp = mergedProducts.find(p=>p.name===cp.name);
-            if(lp){
-                lp.stock = Math.max(lp.stock, cp.stock); // keep highest stock
-                lp.history = [...lp.history, ...cp.history.filter(h=>!lp.history.find(x=>x.d===h.d && x.q===h.q))];
-            } else mergedProducts.push(cp);
-        });
+  /* ================= SALES ================= */
 
-        // Merge sales: avoid duplicates
-        const mergedSales = [...localDB.sales];
-        cloudDB.sales.forEach(cs=>{
-            if(!mergedSales.find(s=>s.d===cs.d && s.n===cs.n && s.q===cs.q)) mergedSales.push(cs);
-        });
+  db.sales.forEach(s=>{
+    sales.innerHTML += `
+    <tr>
+      <td>${s.d}</td>
+      <td>${s.n}</td>
+      <td>${s.q}</td>
+      <td>${s.r}</td>
+      <td>${s.prof}</td>
+    </tr>`;
+  });
 
-        // Merge expenses: avoid duplicates
-        const mergedExpenses = [...localDB.expenses];
-        cloudDB.expenses.forEach(ce=>{
-            if(!mergedExpenses.find(e=>e.d===ce.d && e.n===ce.n && e.a===ce.a)) mergedExpenses.push(ce);
-        });
+  /* ================= EXPENSES ================= */
 
-        // Final merged DB
-        db = {products: mergedProducts, sales: mergedSales, expenses: mergedExpenses};
+  db.expenses.forEach(e=>{
+    expenses.innerHTML += `
+    <tr>
+      <td>${e.d}</td>
+      <td>${e.n}</td>
+      <td>${e.a}</td>
+    </tr>`;
+  });
 
-        // Save merged DB locally
-        localStorage.setItem('KEMITECH_DB', JSON.stringify(db));
+  /* ================= CAPITAL & NET WORTH ================= */
 
-        cloudReady = true;
-        render();
-        await saveToGist(); // push merged data back to cloud
-    } catch(e){
-        console.error(e);
-        cloudReady = true;
-        render();
+  let capital=0;
+  let net=0;
+
+  db.products.forEach(p=>{
+    capital += p.stock * p.buy;
+    net += p.stock * p.sell;
+  });
+
+  document.getElementById("capital").textContent = capital.toFixed(2);
+  document.getElementById("networth").textContent = net.toFixed(2);
+
+  /* ================= SUMMARY ================= */
+
+  const range = summaryRange.value;
+
+  const filteredSales = db.sales.filter(s=>inRange(s.d,range));
+  const filteredExpenses = db.expenses.filter(e=>inRange(e.d,range));
+
+  const revenue = filteredSales.reduce((t,x)=>t+x.r,0);
+
+  const cost = filteredSales.reduce((t,x)=>{
+    const product = db.products.find(p=>p.name===x.n);
+    return t + (product ? x.q * product.buy : 0);
+  },0);
+
+  const expense = filteredExpenses.reduce((t,x)=>t+x.a,0);
+
+  const netProfit = revenue - cost - expense;
+  const availableCash = revenue - expense;
+
+  document.getElementById("rev").textContent = revenue.toFixed(2);
+  document.getElementById("exp").textContent = expense.toFixed(2);
+  document.getElementById("profit").textContent = netProfit.toFixed(2);
+  document.getElementById("cash").textContent = availableCash.toFixed(2);
+
+  localStorage.setItem("KEMITECH_DB", JSON.stringify(db));
+  applyRoleUI();
+  async function loadFromGist(){
+
+  try{
+    const res = await fetch(`https://api.github.com/gists/${GIST_ID}`,{
+      headers:{ Authorization:`Bearer ${GITHUB_TOKEN}` }
+    });
+
+    const data = await res.json();
+
+    if(data.files && data.files[GIST_FILE]){
+
+      const cloudDB = JSON.parse(data.files[GIST_FILE].content || '{}');
+
+      if(cloudDB.products){
+        db = cloudDB;
+        localStorage.setItem("KEMITECH_DB", JSON.stringify(db));
+      }
     }
+
+    render();
+
+  }catch(e){
+    console.log("Cloud load failed. Using local.");
+    render();
+  }
 }
-// ====== EXPORT ======
-function exportCSV(type){ let rows=[], filename=type+'_'+today()+'.csv';
- if(type==='products'){ rows=[['Product','Stock','Buy','Sell']]; db.products.forEach(p=>rows.push([p.name,p.stock,p.buy,p.sell])); }
- if(type==='sales'){ rows=[['Date','Product','Qty','Revenue','Profit']]; db.sales.forEach(s=>rows.push([s.d,s.n,s.q,s.r,s.prof])); }
- if(type==='expenses'){ rows=[['Date','Description','Amount']]; db.expenses.forEach(e=>rows.push([e.d,e.n,e.a])); }
- let csv=rows.map(r=>r.join(',')).join('\n'); let a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download=filename; a.click(); }
+async function adminDeleteShared(){
+  if(role!=="admin") return alert("Admin only");
 
-// ====== ADMIN ======
-function adminResetLocal(){ if(role!=='admin') return alert('Admin only'); localStorage.removeItem('KEMITECH_DB'); db={products:[],sales:[],expenses:[]}; render(); alert("Local data cleared"); }
-async function adminDeleteShared(){ if(role!=='admin') return alert('Admin only'); const txt=prompt("Type DELETE to confirm:"); if(txt!=='DELETE') return; db={products:[],sales:[],expenses:[]}; await saveToGist(); alert("Shared database wiped"); }
-function adminResetApp(){ if(role!=='admin') return alert('Admin only'); if(!confirm("This will delete ALL products, sales, and expenses permanently. Are you sure?")) return; db={products:[],sales:[],expenses:[]}; localStorage.removeItem('KEMITECH_DB'); saveToGist(); alert("App has been completely reset!"); }
+  const confirmDelete = prompt("Type DELETE to confirm:");
+  if(confirmDelete !== "DELETE") return;
 
-// ====== INIT ======
+  db={products:[],sales:[],expenses:[]};
+
+  await fetch(`https://api.github.com/gists/${GIST_ID}`,{
+    method:"PATCH",
+    headers:{
+      Authorization:`Bearer ${GITHUB_TOKEN}`,
+      "Content-Type":"application/json"
+    },
+    body:JSON.stringify({
+      files:{
+        [GIST_FILE]:{
+          content:JSON.stringify(db,null,2)
+        }
+      }
+    })
+  });
+
+  localStorage.removeItem("KEMITECH_DB");
+  render();
+}
+
+}
+
+
+async function saveToCloud(){
+
+  localStorage.setItem("KEMITECH_DB", JSON.stringify(db));
+
+  await fetch(`https://api.github.com/gists/${GIST_ID}`,{
+    method:"PATCH",
+    headers:{
+      Authorization:`Bearer ${GITHUB_TOKEN}`,
+      "Content-Type":"application/json"
+    },
+    body:JSON.stringify({
+      files:{
+        [GIST_FILE]:{
+          content:JSON.stringify(db,null,2)
+        }
+      }
+    })
+  });
+
+  render();
+}
+
+/* ================= ADMIN ================= */
+
+function adminResetLocal(){
+  if(role!=="admin") return alert("Admin only");
+  localStorage.removeItem("KEMITECH_DB");
+  db={products:[],sales:[],expenses:[]};
+  saveToCloud();
+}
+
+function adminResetApp(){
+  if(role!=="admin") return alert("Admin only");
+  db={products:[],sales:[],expenses:[]};
+  saveToCloud();
+}
+
+/* ================= START ================= */
+
 initDB();
 </script>
 
-<footer style="opacity:.3;cursor:pointer;">© KemiTech</footer>
+
+<footer onclick="adminLogin()" style="opacity:.3;cursor:pointer;">© KemiTech</footer>
 </body>
 </html>
