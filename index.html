@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -460,6 +461,9 @@ function render(){
 
   localStorage.setItem("KEMITECH_DB", JSON.stringify(db));
   applyRoleUI();
+
+}
+
   async function loadFromGist(){
 
   try{
@@ -486,6 +490,7 @@ function render(){
     render();
   }
 }
+
 async function adminDeleteShared(){
   if(role!=="admin") return alert("Admin only");
 
@@ -508,13 +513,9 @@ async function adminDeleteShared(){
       }
     })
   });
-
-  localStorage.removeItem("KEMITECH_DB");
+   localStorage.removeItem("KEMITECH_DB");
   render();
 }
-
-}
-
 
 async function saveToCloud(){
 
