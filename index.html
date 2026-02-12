@@ -162,6 +162,7 @@ footer{padding:1rem;text-align:center;color:#fff;background:var(--p);cursor:poin
 <script>
 const ADMIN_PASSWORD = "nonstop@24";
 const USER_PASSWORD  = "money@2026";
+const VIEWER_PASSWORD = "54321"
 
 let role = null;
 
@@ -220,6 +221,9 @@ function unlock(){
   if(pwd.value === ADMIN_PASSWORD){
     role = "admin";
   }
+   else if(pwd.value === VIEWER_PASSWORD){
+    role = "viewer";
+   }
   else if(pwd.value === USER_PASSWORD){
     role = "user";
   }
@@ -232,32 +236,43 @@ function unlock(){
   applyRoleUI();
   loadFromGist();
 }
+ document.getElementById("pass").disabled = true;
 
 /* ================= ROLE ================= */
 
 function applyRoleUI(){
+
+  const isAdmin  = role === "admin";
+  const isUser   = role === "user";
+  const isViewer = role === "viewer";
+
+  // Admin panel visible only to admin
   document.getElementById("adminPanel").style.display =
-  role === "admin" ? "block" : "none";
+    isAdmin ? "block" : "none";
 
+  // Editable fields
+  const canEdit = isAdmin || isUser;
 
-  document.querySelectorAll('.admin-only')
-    .forEach(el => el.style.display = role === "admin" ? "block" : "none");
+  pname.readOnly = !canEdit;
+  buy.readOnly   = !canEdit;
+  sell.readOnly  = !canEdit;
+  stock.readOnly = !canEdit;
 
-  const allowEdit = true; // both admin and user can add
+  sellQty.readOnly = !canEdit;
 
-  document.getElementById('pname').readOnly = !allowEdit;
-  document.getElementById('buy').readOnly = !allowEdit;
-  document.getElementById('sell').readOnly = !allowEdit;
-  document.getElementById('stock').readOnly = !allowEdit;
-  document.getElementById('saveBtn').disabled = !allowEdit;
+  expDesc.readOnly = !canEdit;
+  expAmt.readOnly  = !canEdit;
 
-  document.getElementById('sellProduct').disabled = !allowEdit;
-  document.getElementById('sellQty').readOnly = !allowEdit;
-  document.getElementById('sellBtn').disabled = !allowEdit;
+  // Buttons
+  const saveBtn = document.getElementById("saveBtn");
+  const sellBtn = document.getElementById("sellBtn");
+  const expBtn  = document.getElementById("expBtn");
 
-  document.getElementById('expDesc').readOnly = !allowEdit;
-  document.getElementById('expAmt').readOnly = !allowEdit;
-  document.getElementById('expBtn').disabled = !allowEdit;
+  if(saveBtn) saveBtn.disabled = !canEdit;
+  if(sellBtn) sellBtn.disabled = !canEdit;
+  if(expBtn)  expBtn.disabled  = !canEdit;
+
+  render();
 }
 
 /* ================= RANGE ================= */
@@ -538,6 +553,65 @@ function adminResetApp(){
   if(role!=="admin") return alert("Admin only");
   db={products:[],sales:[],expenses:[]};
   saveToCloud();
+}
+ //export//
+function exportCSV(type){
+
+  let rows = [];
+  let filename = "";
+
+  if(type === "products"){
+    rows.push(["Product","Buy Price","Sell Price","Stock"]);
+    db.products.forEach(p=>{
+      rows.push([p.name, p.buy, p.sell, p.stock]);
+    });
+    filename = "products.csv";
+  }
+
+  if(type === "sales"){
+    rows.push(["Date","Product","Qty","Revenue","Profit"]);
+    db.sales.forEach(s=>{
+      rows.push([s.d, s.n, s.q, s.r, s.prof]);
+    });
+    filename = "sales.csv";
+  }
+
+  if(type === "expenses"){
+    rows.push(["Date","Description","Amount"]);
+    db.expenses.forEach(e=>{
+      rows.push([e.d, e.n, e.a]);
+    });
+    filename = "expenses.csv";
+  }
+
+  let csvContent = rows.map(r => r.join(",")).join("\n");
+
+  const blob = new Blob([csvContent], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+
+  URL.revokeObjectURL(url);
+}
+ //search existing product//
+function fillProduct(){
+
+  const value = psearch.value.trim().toLowerCase();
+
+  if(!value) return;
+
+  const product = db.products.find(p =>
+    p.name.toLowerCase().includes(value)
+  );
+
+  if(product){
+    pname.value = product.name;
+    buy.value = product.buy;
+    sell.value = product.sell;
+  }
 }
 
 /* ================= START ================= */
