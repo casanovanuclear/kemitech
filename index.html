@@ -61,7 +61,7 @@ footer{padding:1rem;text-align:center;color:#fff;background:var(--p);cursor:poin
 <label>Buy Price<input id="buy" type="number"></label>
 <label>Sell Price<input id="sell" type="number"></label>
 <label>Quantity<input id="stock" type="number"></label>
-<button class="primary" onclick="addOrRestock()">Save</button>
+<button id="saveBtn" class="primary" onclick="addOrRestock()">Save</button>
 <p class="small">Existing product = restock. New name = create product.</p>
 </div>
 
@@ -87,7 +87,7 @@ footer{padding:1rem;text-align:center;color:#fff;background:var(--p);cursor:poin
 <h3>Record Sale</h3>
 <label>Product<select id="sellProduct"></select></label>
 <label>Quantity<input id="sellQty" type="number"></label>
-<button class="primary" onclick="sellItem()">Record Sale</button>
+<button id="sellBtn" class="primary" onclick="sellItem()">Record Sale</button>
 </div>
 
 <div class="card">
@@ -113,7 +113,7 @@ footer{padding:1rem;text-align:center;color:#fff;background:var(--p);cursor:poin
 <div class="flex">
 <input id="expDesc" placeholder="Description">
 <input id="expAmt" type="number" placeholder="Amount">
-<button class="danger" onclick="addExpense()">Add</button>
+<button id="expBtn" class="danger" onclick="addExpense()">Add</button>
 </div>
 <select id="expRange" onchange="render()">
 <option value="all">All</option>
