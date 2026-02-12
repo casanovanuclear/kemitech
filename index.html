@@ -486,35 +486,10 @@ function render(){
     render();
   }
 }
-async function adminDeleteShared(){
-  if(role!=="admin") return alert("Admin only");
-
-  const confirmDelete = prompt("Type DELETE to confirm:");
-  if(confirmDelete !== "DELETE") return;
-
-  db={products:[],sales:[],expenses:[]};
-
-  await fetch(`https://api.github.com/gists/${GIST_ID}`,{
-    method:"PATCH",
-    headers:{
-      Authorization:`Bearer ${GITHUB_TOKEN}`,
-      "Content-Type":"application/json"
-    },
-    body:JSON.stringify({
-      files:{
-        [GIST_FILE]:{
-          content:JSON.stringify(db,null,2)
-        }
-      }
-    })
-  });
 
   localStorage.removeItem("KEMITECH_DB");
   render();
 }
-
-}
-
 
 async function saveToCloud(){
 
@@ -552,6 +527,52 @@ function adminResetApp(){
   db={products:[],sales:[],expenses:[]};
   saveToCloud();
 }
+async function adminDeleteShared(){
+
+  if(role !== "admin"){
+    alert("Admin only");
+    return;
+  }
+
+  if(!confirm("This will permanently delete ALL cloud data. Continue?")){
+    return;
+  }
+
+  db = { products:[], sales:[], expenses:[] };
+
+  try{
+
+    const response = await fetch(`https://api.github.com/gists/${GIST_ID}`,{
+      method:"PATCH",
+      headers:{
+        "Authorization": `Bearer ${GITHUB_TOKEN}`,
+        "Accept": "application/vnd.github+json",
+        "Content-Type":"application/json"
+      },
+      body: JSON.stringify({
+        files:{
+          [GIST_FILE]:{
+            content: JSON.stringify(db,null,2)
+          }
+        }
+      })
+    });
+
+    if(!response.ok){
+      alert("Cloud delete failed");
+      return;
+    }
+
+    localStorage.removeItem("KEMITECH_DB");
+    render();
+    alert("Cloud data deleted successfully");
+
+  }catch(err){
+    console.error(err);
+    alert("Network error");
+  }
+}
+
  //export//
 function exportCSV(type){
 
