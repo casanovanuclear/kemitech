@@ -166,7 +166,7 @@ const USER_PASSWORD  = "money@2026";
 let role = null;
 
 const GIST_ID='a17292402f076ba0c5531f4144ef71b';
-const GITHUB_TOKEN='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';
+const GITHUB_TOKEN='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';
 const GIST_FILE = "kemitech-db.json";
 
 let db = { products: [], sales: [], expenses: [] };
@@ -174,6 +174,35 @@ let db = { products: [], sales: [], expenses: [] };
 function today(){
   return new Date().toISOString().split('T')[0];
 }
+ async function loadFromGist(){
+  try{
+    const res = await fetch(`https://api.github.com/gists/${GIST_ID}`);
+
+    if(!res.ok){
+      console.error("Failed to fetch gist", res.status);
+      return;
+    }
+
+    const data = await res.json();
+
+    if(!data.files || !data.files[GIST_FILE]){
+      console.error("Gist file not found");
+      return;
+    }
+
+    const content = data.files[GIST_FILE].content;
+
+    if(content){
+      db = JSON.parse(content);
+      localStorage.setItem("KEMITECH_DB", JSON.stringify(db));
+      render();
+    }
+
+  }catch(err){
+    console.error("Cloud load error:", err);
+  }
+}
+
 
 /* ================= INIT ================= */
 
