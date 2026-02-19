@@ -426,7 +426,7 @@ db.sales
       <td>${s.n}</td>
       <td>${s.q}</td>
       <td>${s.r}</td>
-      <td>${s.prof}</td>
+      <td>${role === "viewer" ? "Hidden" : s.prof}</td>
     </tr>`;
 
 });
@@ -476,7 +476,8 @@ db.sales
 
   document.getElementById("rev").textContent = revenue.toFixed(2);
   document.getElementById("exp").textContent = expense.toFixed(2);
-  document.getElementById("profit").textContent = netProfit.toFixed(2);
+  document.getElementById("profit").textContent =
+  role === "viewer" ? "Null" : netProfit.toFixed(2);
   document.getElementById("cash").textContent = availableCash.toFixed(2);
 
   localStorage.setItem("KEMITECH_DB", JSON.stringify(db));
