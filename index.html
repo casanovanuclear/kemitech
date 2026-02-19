@@ -406,7 +406,19 @@ db.products
 
   /* ================= SALES ================= */
 
-  db.sales.forEach(s=>{
+const saleSearchValue = document.getElementById("saleSearch").value.toLowerCase();
+const saleRangeValue  = document.getElementById("saleRange").value;
+
+db.sales
+  .filter(s =>
+    inRange(s.d, saleRangeValue) &&
+    (
+      s.n.toLowerCase().includes(saleSearchValue) ||
+      s.d.includes(saleSearchValue)
+    )
+  )
+  .forEach(s=>{
+
     sales.innerHTML += `
     <tr>
       <td>${s.d}</td>
@@ -415,7 +427,9 @@ db.products
       <td>${s.r}</td>
       <td>${s.prof}</td>
     </tr>`;
-  });
+
+});
+
 
   /* ================= EXPENSES ================= */
 
