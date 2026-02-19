@@ -385,13 +385,10 @@ function render(){
 const productSearchValue = document.getElementById("search").value.toLowerCase();
 
 db.products
-.filter(s =>
-  inRange(s.d, saleRangeValue) &&
-  Object.values(s)
-    .join(" ")
-    .toLowerCase()
-    .includes(saleSearchValue)
-)
+  .filter(p =>
+    p.name.toLowerCase().includes(productSearchValue)
+  )
+  .forEach((p,i)=>{
 
     products.innerHTML += `
     <tr>
@@ -406,19 +403,21 @@ db.products
 
   });
 
-/* ================= SALES ================= */
+
+  /* ================= SALES ================= */
 
 const saleSearchValue = document.getElementById("saleSearch").value.toLowerCase();
 const saleRangeValue  = document.getElementById("saleRange").value;
 
 db.sales
-  .filter(s =>
-    inRange(s.d, saleRangeValue) &&
-    (
-      s.n.toLowerCase().includes(saleSearchValue) ||
-      s.d.includes(saleSearchValue)
-    )
-  )
+ .filter(s =>
+  inRange(s.d, saleRangeValue) &&
+  Object.values(s)
+    .join(" ")
+    .toLowerCase()
+    .includes(saleSearchValue)
+)
+
   .forEach(s=>{
 
     sales.innerHTML += `
