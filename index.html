@@ -86,8 +86,15 @@ footer{padding:1rem;text-align:center;color:#fff;background:var(--p);cursor:poin
 <!-- SALES -->
 <div class="card">
 <h3>Record Sale</h3>
-<label>Product<select id="sellProduct"></select></label>
-<label>Quantity<input id="sellQty" type="number"></label>
+
+<label>Product
+<select id="sellProduct"></select>
+</label>
+
+<label>Quantity
+<input id="sellQty" type="number">
+</label>
+
 <button id="sellBtn" class="primary" onclick="sellItem()">Record Sale</button>
 </div>
 
@@ -168,7 +175,7 @@ const VIEWER_PASSWORD = "54321"
 let role = null;
 
 const GIST_ID='0c8c175f92d319a966e7a2d081222409';
-const GITHUB_TOKEN='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';
+const GITHUB_TOKEN='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';
 const GIST_FILE = "kemitech-db.json";
 
 let db = { products: [], sales: [], expenses: [] };
@@ -429,7 +436,17 @@ db.sales
       <td>${role === "viewer" ? "Null" : s.prof}</td>
     </tr>`;
 
-});
+})
+// Populate sell dropdown with search filter
+const sellSearchValue = document.getElementById("sellSearch")?.value?.toLowerCase() || "";
+
+db.products
+  .filter(p =>
+    p.name.toLowerCase().includes(sellSearchValue)
+  )
+  .forEach((p,i)=>{
+    sellProduct.innerHTML += `<option value="${i}">${p.name} (${p.stock})</option>`;
+  });
 
   /* ================= EXPENSES ================= */
 
