@@ -183,6 +183,35 @@ let db = { products: [], sales: [], expenses: [] };
 function today(){
   return new Date().toISOString().split('T')[0];
 }
+ async function loadFromGist(){
+  try{
+    const res = await fetch(`https://api.github.com/gists/${GIST_ID}`);
+
+    if(!res.ok){
+      console.error("Failed to fetch gist", res.status);
+      return;
+    }
+
+    const data = await res.json();
+
+    if(!data.files || !data.files[GIST_FILE]){
+      console.error("Gist file not found");
+      return;
+    }
+
+    const content = data.files[GIST_FILE].content;
+
+    if(content){
+      db = JSON.parse(content);
+      localStorage.setItem("KEMITECH_DB", JSON.stringify(db));
+      render();
+    }
+
+  }catch(err){
+    console.error("Cloud load error:", err);
+  }
+}
+
 
 /* ================= INIT ================= */
 
@@ -325,8 +354,6 @@ function sellItem(){
     n:p.name,
     q,
     r:q*p.sell,
-   buyAtSale: p.buy,
-   sellAtSale: p.sell,
     prof:q*(p.sell-p.buy)
   });
 
@@ -454,7 +481,10 @@ db.products
 
   const revenue = filteredSales.reduce((t,x)=>t+x.r,0);
 
-  const cost = filteredSales.reduce((t,x)=>t + (x.q * x.buyAtSale),0);
+  const cost = filteredSales.reduce((t,x)=>{
+    const product = db.products.find(p=>p.name===x.n);
+    return t + (product ? x.q * product.buy : 0);
+  },0);
 
   const expense = filteredExpenses.reduce((t,x)=>t+x.a,0);
 
@@ -521,23 +551,27 @@ async function adminDeleteShared(){
 }
 
 async function saveToCloud(){
+
   localStorage.setItem("KEMITECH_DB", JSON.stringify(db));
 
-  try{
-    const res = await fetch(...);
-
-    if(!res.ok){
-      console.error("Cloud save failed", res.status);
-      return;
-    }
-
-  }catch(e){
-    console.error("Cloud error", e);
-  }
+  await fetch(`https://api.github.com/gists/${GIST_ID}`,{
+    method:"PATCH",
+    headers:{
+      Authorization:`Bearer ${GITHUB_TOKEN}`,
+      "Content-Type":"application/json"
+    },
+    body:JSON.stringify({
+      files:{
+        [GIST_FILE]:{
+          content:JSON.stringify(db,null,2)
+        }
+      }
+    })
+  });
 
   render();
 }
- 
+
 /* ================= ADMIN ================= */
  function removeProductByName(name){
   if(role !== "admin"){
